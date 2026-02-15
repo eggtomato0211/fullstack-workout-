@@ -1,0 +1,12 @@
+# Workspace directories (created per-session)
+**/workspace/
+!**/workspace/.gitkeep
+
+# Dependencies
+node_modules/
+
+# Database
+postgres-data/
+
+# OS
+.DS_Store
