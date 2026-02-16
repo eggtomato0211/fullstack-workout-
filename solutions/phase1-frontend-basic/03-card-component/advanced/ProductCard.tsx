@@ -1,6 +1,13 @@
 import Card, { CardBody, CardFooter } from './Card';
 
-function ProductCard({ name, description, price, variant = 'default' }) {
+type Props = {
+  name: string;
+  description: string;
+  price: string;
+  variant?: 'default' | 'outlined';
+};
+
+function ProductCard({ name, description, price, variant = 'default' }: Props) {
   return (
     <Card variant={variant}>
       <div className="h-48 bg-gray-300 flex items-center justify-center">

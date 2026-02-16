@@ -1,19 +1,37 @@
-function Alert({ variant = 'info', children, onClose }) {
-  const variantClasses = {
+import { useEffect, type ReactNode } from 'react';
+
+type Variant = 'success' | 'warning' | 'error' | 'info';
+
+type Props = {
+  variant?: Variant;
+  children: ReactNode;
+  onClose?: () => void;
+  autoClose?: number;
+};
+
+function Alert({ variant = 'info', children, onClose, autoClose = 0 }: Props) {
+  const variantClasses: Record<Variant, string> = {
     success: 'bg-green-50 border-green-500 text-green-800',
     warning: 'bg-yellow-50 border-yellow-500 text-yellow-800',
     error: 'bg-red-50 border-red-500 text-red-800',
     info: 'bg-blue-50 border-blue-500 text-blue-800',
   };
 
-  const icons = { success: '✓', warning: '⚠', error: '✕', info: 'ℹ' };
+  const icons: Record<Variant, string> = { success: '✓', warning: '⚠', error: '✕', info: 'ℹ' };
 
-  const iconClasses = {
+  const iconClasses: Record<Variant, string> = {
     success: 'bg-green-500',
     warning: 'bg-yellow-500',
     error: 'bg-red-500',
     info: 'bg-blue-500',
   };
+
+  useEffect(() => {
+    if (autoClose > 0 && onClose) {
+      const timer = setTimeout(onClose, autoClose);
+      return () => clearTimeout(timer);
+    }
+  }, [autoClose, onClose]);
 
   return (
     <div

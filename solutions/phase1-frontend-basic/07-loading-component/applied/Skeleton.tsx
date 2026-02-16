@@ -1,5 +1,11 @@
-function Skeleton({ width, height, rounded = 'md' }) {
-  const roundedClasses = {
+type Props = {
+  width: string;
+  height: string;
+  rounded?: 'none' | 'sm' | 'md' | 'lg' | 'full';
+};
+
+function Skeleton({ width, height, rounded = 'md' }: Props) {
+  const roundedClasses: Record<string, string> = {
     none: 'rounded-none',
     sm: 'rounded-sm',
     md: 'rounded',

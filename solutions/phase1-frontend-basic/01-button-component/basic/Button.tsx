@@ -1,5 +1,13 @@
-function Button({ variant = 'primary', children, onClick }) {
-  const variantClasses = {
+import type { ReactNode } from 'react';
+
+type Props = {
+  variant?: 'primary' | 'secondary' | 'outline';
+  children: ReactNode;
+  onClick?: () => void;
+};
+
+function Button({ variant = 'primary', children, onClick }: Props) {
+  const variantClasses: Record<string, string> = {
     primary: 'bg-blue-600 text-white hover:bg-blue-700',
     secondary: 'bg-gray-200 text-gray-800 hover:bg-gray-300',
     outline: 'bg-white text-blue-600 border border-blue-600 hover:bg-blue-50',

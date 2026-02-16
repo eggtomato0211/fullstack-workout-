@@ -1,6 +1,11 @@
 import { useState } from 'react';
 
-function Dropdown({ label, items }) {
+type Props = {
+  label: string;
+  items: string[];
+};
+
+function Dropdown({ label, items }: Props) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (

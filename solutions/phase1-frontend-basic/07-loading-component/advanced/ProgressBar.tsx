@@ -1,4 +1,10 @@
-function ProgressBar({ value, max = 100, label }) {
+type Props = {
+  value: number;
+  max?: number;
+  label?: string;
+};
+
+function ProgressBar({ value, max = 100, label }: Props) {
   const percentage = Math.min(Math.max((value / max) * 100, 0), 100);
 
   return (

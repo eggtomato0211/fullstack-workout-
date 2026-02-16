@@ -4,7 +4,7 @@ import ProgressBar from './ProgressBar';
 function App() {
   const [progress, setProgress] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
-  const [data, setData] = useState(null);
+  const [data, setData] = useState<string | null>(null);
 
   const fetchData = () => {
     setIsLoading(true);
