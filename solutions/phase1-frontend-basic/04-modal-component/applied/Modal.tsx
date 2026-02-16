@@ -1,8 +1,14 @@
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 
-function Modal({ isOpen, onClose, children }) {
+type Props = {
+  isOpen: boolean;
+  onClose: () => void;
+  children: ReactNode;
+};
+
+function Modal({ isOpen, onClose, children }: Props) {
   useEffect(() => {
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
 
@@ -11,15 +17,6 @@ function Modal({ isOpen, onClose, children }) {
     }
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
-
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [isOpen]);
 
   if (!isOpen) return null;
 

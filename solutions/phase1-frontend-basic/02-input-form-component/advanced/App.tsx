@@ -1,13 +1,13 @@
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import Input from './Input';
 
 function App() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [errors, setErrors] = useState({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const validate = () => {
-    const newErrors = {};
+    const newErrors: Record<string, string> = {};
 
     if (!email) {
       newErrors.email = 'メールアドレスを入力してください';
@@ -25,7 +25,7 @@ function App() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (validate()) {
       alert('送信成功！');

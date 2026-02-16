@@ -1,5 +1,12 @@
-function Card({ variant = 'default', children }) {
-  const variantClasses = {
+import type { ReactNode } from 'react';
+
+type CardProps = {
+  variant?: 'default' | 'outlined' | 'elevated';
+  children: ReactNode;
+};
+
+function Card({ variant = 'default', children }: CardProps) {
+  const variantClasses: Record<string, string> = {
     default: 'bg-white shadow-md',
     outlined: 'bg-white border-2 border-gray-200',
     elevated: 'bg-white shadow-xl',
@@ -12,7 +19,11 @@ function Card({ variant = 'default', children }) {
   );
 }
 
-export function CardHeader({ children }) {
+type SectionProps = {
+  children: ReactNode;
+};
+
+export function CardHeader({ children }: SectionProps) {
   return (
     <div className="px-6 py-4 border-b border-gray-200">
       {children}
@@ -20,7 +31,7 @@ export function CardHeader({ children }) {
   );
 }
 
-export function CardBody({ children }) {
+export function CardBody({ children }: SectionProps) {
   return (
     <div className="px-6 py-4">
       {children}
@@ -28,7 +39,7 @@ export function CardBody({ children }) {
   );
 }
 
-export function CardFooter({ children }) {
+export function CardFooter({ children }: SectionProps) {
   return (
     <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
       {children}

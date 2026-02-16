@@ -1,12 +1,19 @@
 import { useState, useRef, useEffect } from 'react';
 
-function Dropdown({ label, items, value, onChange }) {
+type Props = {
+  label: string;
+  items: string[];
+  value: string;
+  onChange: (value: string) => void;
+};
+
+function Dropdown({ label, items, value, onChange }: Props) {
   const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setIsOpen(false);
       }
     };

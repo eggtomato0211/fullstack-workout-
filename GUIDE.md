@@ -99,17 +99,17 @@ web-dev-workout/
 │   └── frontend-basic/
 │       └── workspace/              # 作業場所 (gitignore)
 │           └── src/
-│               ├── App.jsx         # ← ここを編集
+│               ├── App.tsx         # ← ここを編集
 │               └── components/     # ← コンポーネントを作成
 │
 └── solutions/                      # 解答保存 (git管理)
     └── phase1-frontend-basic/
         ├── 01-button-component/
-        │   ├── App.jsx
-        │   └── Button.jsx
+        │   ├── App.tsx
+        │   └── Button.tsx
         ├── 02-input-form-component/
-        │   ├── App.jsx
-        │   └── InputForm.jsx
+        │   ├── App.tsx
+        │   └── Input.tsx
         └── ...
 ```
 
@@ -121,10 +121,9 @@ web-dev-workout/
 
 ```
 workspace/src/
-├── App.jsx              # エントリポイント（問題ごとに書き換え）
-├── App.css              # スタイル（必要なら）
+├── App.tsx              # エントリポイント（問題ごとに書き換え）
 ├── components/          # コンポーネントを切り出す場合
-│   └── Button.jsx
+│   └── Button.tsx
 └── index.css            # Tailwind読み込み（変更不要）
 ```
 
@@ -135,9 +134,9 @@ workspace/src/
 ```bash
 # 例: 01-button-component の解答を保存
 mkdir -p solutions/phase1-frontend-basic/01-button-component
-cp environments/frontend-basic/workspace/src/App.jsx \
+cp environments/frontend-basic/workspace/src/App.tsx \
    solutions/phase1-frontend-basic/01-button-component/
-cp environments/frontend-basic/workspace/src/components/Button.jsx \
+cp environments/frontend-basic/workspace/src/components/Button.tsx \
    solutions/phase1-frontend-basic/01-button-component/
 ```
 
@@ -150,7 +149,7 @@ cp environments/frontend-basic/workspace/src/components/Button.jsx \
 rm -rf environments/frontend-basic/workspace/src/components
 ```
 
-`App.jsx` は次の問題のコードで上書きすればOK。
+`App.tsx` は次の問題のコードで上書きすればOK。
 
 #### 4. 解答をコミットする
 
@@ -165,6 +164,6 @@ git commit -m "01-button-component の解答を追加"
 
 | Phase | 環境ディレクトリ | 技術スタック | ポート |
 |---|---|---|---|
-| Phase 1 | `environments/frontend-basic/` | Vite + React + Tailwind CSS | 3000 |
+| Phase 1 | `environments/frontend-basic/` | Vite + React + Tailwind CSS + TypeScript | 3000 |
 | Phase 2 | `environments/frontend-advanced/` | Next.js (予定) | - |
 | Phase 3-4 | `environments/backend/` | Go (予定) | - |

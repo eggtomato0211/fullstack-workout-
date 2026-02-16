@@ -1,10 +1,18 @@
 import { useState } from 'react';
 import Alert from './Alert';
 
-function App() {
-  const [alerts, setAlerts] = useState([]);
+type Variant = 'success' | 'warning' | 'error' | 'info';
 
-  const variants = ['success', 'warning', 'error', 'info'];
+type AlertItem = {
+  id: number;
+  variant: Variant;
+  message: string;
+};
+
+const variants: Variant[] = ['success', 'warning', 'error', 'info'];
+
+function App() {
+  const [alerts, setAlerts] = useState<AlertItem[]>([]);
 
   const addAlert = () => {
     const variant = variants[Math.floor(Math.random() * variants.length)];
@@ -15,7 +23,7 @@ function App() {
     ]);
   };
 
-  const removeAlert = (id) => {
+  const removeAlert = (id: number) => {
     setAlerts((prev) => prev.filter((a) => a.id !== id));
   };
 

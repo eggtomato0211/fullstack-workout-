@@ -1,15 +1,23 @@
 import { useState } from 'react';
 import Alert from './Alert';
 
+type Variant = 'success' | 'warning' | 'error' | 'info';
+
+type AlertItem = {
+  id: number;
+  variant: Variant;
+  message: string;
+};
+
 function App() {
-  const [alerts, setAlerts] = useState([
+  const [alerts, setAlerts] = useState<AlertItem[]>([
     { id: 1, variant: 'success', message: '保存が完了しました。' },
     { id: 2, variant: 'warning', message: '入力内容を確認してください。' },
     { id: 3, variant: 'error', message: 'エラーが発生しました。' },
     { id: 4, variant: 'info', message: '新しいバージョンが利用可能です。' },
   ]);
 
-  const removeAlert = (id) => {
+  const removeAlert = (id: number) => {
     setAlerts((prev) => prev.filter((a) => a.id !== id));
   };
 

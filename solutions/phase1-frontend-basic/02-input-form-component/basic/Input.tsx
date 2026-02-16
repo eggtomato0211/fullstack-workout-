@@ -1,4 +1,13 @@
-function Input({ label, value, onChange, placeholder }) {
+import type { ChangeEvent } from 'react';
+
+type Props = {
+  label: string;
+  value: string;
+  onChange: (e: ChangeEvent<HTMLInputElement>) => void;
+  placeholder?: string;
+};
+
+function Input({ label, value, onChange, placeholder }: Props) {
   return (
     <div className="flex flex-col gap-1">
       <label className="text-sm font-medium text-gray-700">
