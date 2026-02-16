@@ -13,19 +13,23 @@ Loading系コンポーネントは、データ取得や処理の待ち時間に�
 
 ### 基本: Spinner
 
-```jsx
-function Spinner({ size = 'md' }) {
-  const sizeClasses = {
+```tsx
+type Props = {
+  size?: 'sm' | 'md' | 'lg';
+};
+
+function Spinner({ size = 'md' }: Props) {
+  const sizeClasses: Record<string, string> = {
     sm: 'h-4 w-4 border-2',
     md: 'h-8 w-8 border-3',
     lg: 'h-12 w-12 border-4',
   };
 
   return (
-    <div
-      className={`animate-spin rounded-full border-blue-600 border-t-transparent ${sizeClasses[size]}`}
-      role="status"
-    >
+    <div role="status">
+      <div
+        className={`animate-spin rounded-full border-blue-600 border-t-transparent ${sizeClasses[size]}`}
+      />
       <span className="sr-only">読み込み中...</span>
     </div>
   );
@@ -45,9 +49,15 @@ function App() {
 
 ### 応用: Skeleton
 
-```jsx
-function Skeleton({ width, height, rounded = 'md' }) {
-  const roundedClasses = {
+```tsx
+type SkeletonProps = {
+  width: string;
+  height: string;
+  rounded?: 'none' | 'sm' | 'md' | 'lg' | 'full';
+};
+
+function Skeleton({ width, height, rounded = 'md' }: SkeletonProps) {
+  const roundedClasses: Record<string, string> = {
     none: 'rounded-none',
     sm: 'rounded-sm',
     md: 'rounded',
@@ -97,10 +107,16 @@ function App() {
 
 ### 実践: Progress Bar
 
-```jsx
-import { useState, useEffect } from 'react';
+```tsx
+import { useState } from 'react';
 
-function ProgressBar({ value, max = 100, label }) {
+type ProgressBarProps = {
+  value: number;
+  max?: number;
+  label?: string;
+};
+
+function ProgressBar({ value, max = 100, label }: ProgressBarProps) {
   const percentage = Math.min(Math.max((value / max) * 100, 0), 100);
 
   return (
@@ -125,7 +141,7 @@ function ProgressBar({ value, max = 100, label }) {
 function App() {
   const [progress, setProgress] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
-  const [data, setData] = useState(null);
+  const [data, setData] = useState<string | null>(null);
 
   const fetchData = () => {
     setIsLoading(true);
@@ -175,8 +191,12 @@ function App() {
 
 3サイズ（`sm`, `md`, `lg`）に対応するSpinnerコンポーネントを作ってください。
 
-```jsx
-function Spinner({ size = 'md' }) {
+```tsx
+type Props = {
+  size?: 'sm' | 'md' | 'lg';
+};
+
+function Spinner({ size = 'md' }: Props) {
   // ここにコードを書く
   // size に応じてサイズを切り替える
   // CSSアニメーション（animate-spin）で回転させる
@@ -209,8 +229,14 @@ function Spinner({ size = 'md' }) {
 4. 実際のカードコンテンツと同じレイアウトでSkeletonを配置
 
 **ヒント:**
-```jsx
-function Skeleton({ width, height, rounded = 'md' }) {
+```tsx
+type Props = {
+  width: string;
+  height: string;
+  rounded?: 'none' | 'sm' | 'md' | 'lg' | 'full';
+};
+
+function Skeleton({ width, height, rounded = 'md' }: Props) {
   // bg-gray-200 + animate-pulse でパルスアニメーション
   // style={{ width, height }} でサイズ指定
 }

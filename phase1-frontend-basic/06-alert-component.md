@@ -13,9 +13,18 @@ Alertはユーザーに状態や結果を伝えるための通知コンポーネ
 
 ### 基本: 4種類のAlert
 
-```jsx
-function Alert({ variant = 'info', children }) {
-  const variantClasses = {
+```tsx
+import type { ReactNode } from 'react';
+
+type Variant = 'success' | 'warning' | 'error' | 'info';
+
+type Props = {
+  variant?: Variant;
+  children: ReactNode;
+};
+
+function Alert({ variant = 'info', children }: Props) {
+  const variantClasses: Record<Variant, string> = {
     success: 'bg-green-50 border-green-500 text-green-800',
     warning: 'bg-yellow-50 border-yellow-500 text-yellow-800',
     error: 'bg-red-50 border-red-500 text-red-800',
@@ -47,23 +56,32 @@ function App() {
 
 ### 応用: アイコン付きAlert
 
-```jsx
-function Alert({ variant = 'info', children }) {
-  const variantClasses = {
+```tsx
+import type { ReactNode } from 'react';
+
+type Variant = 'success' | 'warning' | 'error' | 'info';
+
+type Props = {
+  variant?: Variant;
+  children: ReactNode;
+};
+
+function Alert({ variant = 'info', children }: Props) {
+  const variantClasses: Record<Variant, string> = {
     success: 'bg-green-50 border-green-500 text-green-800',
     warning: 'bg-yellow-50 border-yellow-500 text-yellow-800',
     error: 'bg-red-50 border-red-500 text-red-800',
     info: 'bg-blue-50 border-blue-500 text-blue-800',
   };
 
-  const icons = {
+  const icons: Record<Variant, string> = {
     success: '✓',
     warning: '⚠',
     error: '✕',
     info: 'ℹ',
   };
 
-  const iconClasses = {
+  const iconClasses: Record<Variant, string> = {
     success: 'bg-green-500',
     warning: 'bg-yellow-500',
     error: 'bg-red-500',
@@ -100,25 +118,34 @@ function App() {
 
 ### 実践: 閉じるボタン + 自動消去
 
-```jsx
-import { useState, useEffect } from 'react';
+```tsx
+import { useState, useEffect, type ReactNode } from 'react';
 
-function Alert({ variant = 'info', children, onClose, autoClose = 0 }) {
-  const variantClasses = {
+type Variant = 'success' | 'warning' | 'error' | 'info';
+
+type Props = {
+  variant?: Variant;
+  children: ReactNode;
+  onClose?: () => void;
+  autoClose?: number;
+};
+
+function Alert({ variant = 'info', children, onClose, autoClose = 0 }: Props) {
+  const variantClasses: Record<Variant, string> = {
     success: 'bg-green-50 border-green-500 text-green-800',
     warning: 'bg-yellow-50 border-yellow-500 text-yellow-800',
     error: 'bg-red-50 border-red-500 text-red-800',
     info: 'bg-blue-50 border-blue-500 text-blue-800',
   };
 
-  const icons = {
+  const icons: Record<Variant, string> = {
     success: '✓',
     warning: '⚠',
     error: '✕',
     info: 'ℹ',
   };
 
-  const iconClasses = {
+  const iconClasses: Record<Variant, string> = {
     success: 'bg-green-500',
     warning: 'bg-yellow-500',
     error: 'bg-red-500',
@@ -157,18 +184,25 @@ function Alert({ variant = 'info', children, onClose, autoClose = 0 }) {
 }
 
 // 使用例
+type AlertItem = {
+  id: number;
+  variant: Variant;
+  message: string;
+  autoClose: number;
+};
+
 function App() {
-  const [alerts, setAlerts] = useState([
+  const [alerts, setAlerts] = useState<AlertItem[]>([
     { id: 1, variant: 'success', message: '保存が完了しました。', autoClose: 3000 },
     { id: 2, variant: 'error', message: 'エラーが発生しました。', autoClose: 0 },
   ]);
 
-  const removeAlert = (id) => {
+  const removeAlert = (id: number) => {
     setAlerts((prev) => prev.filter((alert) => alert.id !== id));
   };
 
   const addAlert = () => {
-    const newAlert = {
+    const newAlert: AlertItem = {
       id: Date.now(),
       variant: 'info',
       message: `新しい通知です（${new Date().toLocaleTimeString()}）`,
@@ -209,8 +243,17 @@ function App() {
 
 4種類のvariant（`success`, `warning`, `error`, `info`）に対応するAlertコンポーネントを作ってください。
 
-```jsx
-function Alert({ variant = 'info', children }) {
+```tsx
+import type { ReactNode } from 'react';
+
+type Variant = 'success' | 'warning' | 'error' | 'info';
+
+type Props = {
+  variant?: Variant;
+  children: ReactNode;
+};
+
+function Alert({ variant = 'info', children }: Props) {
   // ここにコードを書く
   // variant に応じて背景色・ボーダー色・文字色を切り替える
 
@@ -242,8 +285,18 @@ function Alert({ variant = 'info', children }) {
 4. 閉じるボタンクリックで`onClose`コールバックを呼ぶ
 
 **ヒント:**
-```jsx
-function Alert({ variant = 'info', children, onClose }) {
+```tsx
+import type { ReactNode } from 'react';
+
+type Variant = 'success' | 'warning' | 'error' | 'info';
+
+type Props = {
+  variant?: Variant;
+  children: ReactNode;
+  onClose?: () => void;
+};
+
+function Alert({ variant = 'info', children, onClose }: Props) {
   // icons オブジェクトで variant ごとのアイコンを定義
   // onClose が存在する場合のみ閉じるボタンを表示
 }

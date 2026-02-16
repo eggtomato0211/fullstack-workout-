@@ -13,10 +13,15 @@ Dropdownはトリガー要素のクリックでメニューを表示し、項目
 
 ### 基本: トグルで開閉
 
-```jsx
+```tsx
 import { useState } from 'react';
 
-function Dropdown({ label, items }) {
+type Props = {
+  label: string;
+  items: string[];
+};
+
+function Dropdown({ label, items }: Props) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -33,8 +38,8 @@ function Dropdown({ label, items }) {
 
       {isOpen && (
         <ul className="absolute top-full left-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-10">
-          {items.map((item, index) => (
-            <li key={index}>
+          {items.map((item) => (
+            <li key={item}>
               <button
                 className="w-full text-left px-4 py-2 hover:bg-gray-100 text-gray-700"
                 onClick={() => {
@@ -67,17 +72,22 @@ function App() {
 
 ### 応用: 外側クリックで閉じる（useRef + useEffect）
 
-```jsx
+```tsx
 import { useState, useRef, useEffect } from 'react';
 
-function Dropdown({ label, items }) {
+type Props = {
+  label: string;
+  items: string[];
+};
+
+function Dropdown({ label, items }: Props) {
   const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // 外側クリックで閉じる
   useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setIsOpen(false);
       }
     };
@@ -105,8 +115,8 @@ function Dropdown({ label, items }) {
 
       {isOpen && (
         <ul className="absolute top-full left-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-10">
-          {items.map((item, index) => (
-            <li key={index}>
+          {items.map((item) => (
+            <li key={item}>
               <button
                 className="w-full text-left px-4 py-2 hover:bg-gray-100 text-gray-700"
                 onClick={() => {
@@ -142,18 +152,25 @@ function App() {
 
 ### 実践: 選択値の管理 + キーボード操作
 
-```jsx
-import { useState, useRef, useEffect } from 'react';
+```tsx
+import { useState, useRef, useEffect, type KeyboardEvent } from 'react';
 
-function Dropdown({ label, items, value, onChange }) {
+type Props = {
+  label: string;
+  items: string[];
+  value: string;
+  onChange: (value: string) => void;
+};
+
+function Dropdown({ label, items, value, onChange }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
-  const dropdownRef = useRef(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // 外側クリックで閉じる
   useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setIsOpen(false);
       }
     };
@@ -168,7 +185,7 @@ function Dropdown({ label, items, value, onChange }) {
   }, [isOpen]);
 
   // キーボード操作
-  const handleKeyDown = (e) => {
+  const handleKeyDown = (e: KeyboardEvent) => {
     if (!isOpen) {
       if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') {
         e.preventDefault();
@@ -224,7 +241,7 @@ function Dropdown({ label, items, value, onChange }) {
       {isOpen && (
         <ul className="absolute top-full left-0 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-10">
           {items.map((item, index) => (
-            <li key={index}>
+            <li key={item}>
               <button
                 className={`w-full text-left px-4 py-2 text-gray-700 ${
                   index === highlightedIndex
@@ -273,8 +290,15 @@ function App() {
 
 クリックでメニューを開閉するDropdownコンポーネントを作ってください。
 
-```jsx
-function Dropdown({ label, items }) {
+```tsx
+import { useState } from 'react';
+
+type Props = {
+  label: string;
+  items: string[];
+};
+
+function Dropdown({ label, items }: Props) {
   // ここにコードを書く
   // isOpen state でメニューの表示/非表示を切り替え
   // items を map でリスト表示
@@ -306,12 +330,12 @@ function Dropdown({ label, items }) {
 5. `onChange`コールバックで親に選択値を通知
 
 **ヒント:**
-```jsx
-const dropdownRef = useRef(null);
+```tsx
+const dropdownRef = useRef<HTMLDivElement>(null);
 
 useEffect(() => {
-  const handleClickOutside = (e) => {
-    if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+  const handleClickOutside = (e: MouseEvent) => {
+    if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
       // 閉じる処理
     }
   };

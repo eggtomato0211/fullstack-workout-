@@ -13,10 +13,17 @@ Input/Formはユーザーからデータを受け取るための基本コンポ�
 
 ### 基本: テキスト入力
 
-```jsx
-import { useState } from 'react';
+```tsx
+import { useState, type ChangeEvent } from 'react';
 
-function Input({ label, value, onChange, placeholder }) {
+type Props = {
+  label: string;
+  value: string;
+  onChange: (e: ChangeEvent<HTMLInputElement>) => void;
+  placeholder?: string;
+};
+
+function Input({ label, value, onChange, placeholder }: Props) {
   return (
     <div className="flex flex-col gap-1">
       <label className="text-sm font-medium text-gray-700">
@@ -53,10 +60,19 @@ function App() {
 
 ### 応用: type切替 + ラベル紐付け
 
-```jsx
-import { useState } from 'react';
+```tsx
+import { useState, type ChangeEvent } from 'react';
 
-function Input({ label, type = 'text', value, onChange, placeholder, id }) {
+type Props = {
+  label: string;
+  type?: string;
+  value: string;
+  onChange: (e: ChangeEvent<HTMLInputElement>) => void;
+  placeholder?: string;
+  id?: string;
+};
+
+function Input({ label, type = 'text', value, onChange, placeholder, id }: Props) {
   return (
     <div className="flex flex-col gap-1">
       <label
@@ -107,10 +123,20 @@ function App() {
 
 ### 実践: バリデーション + エラーメッセージ表示
 
-```jsx
-import { useState } from 'react';
+```tsx
+import { useState, type ChangeEvent, type FormEvent } from 'react';
 
-function Input({ label, type = 'text', value, onChange, placeholder, id, error }) {
+type Props = {
+  label: string;
+  type?: string;
+  value: string;
+  onChange: (e: ChangeEvent<HTMLInputElement>) => void;
+  placeholder?: string;
+  id?: string;
+  error?: string;
+};
+
+function Input({ label, type = 'text', value, onChange, placeholder, id, error }: Props) {
   return (
     <div className="flex flex-col gap-1">
       <label
@@ -142,10 +168,10 @@ function Input({ label, type = 'text', value, onChange, placeholder, id, error }
 function App() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [errors, setErrors] = useState({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const validate = () => {
-    const newErrors = {};
+    const newErrors: Record<string, string> = {};
 
     if (!email) {
       newErrors.email = 'メールアドレスを入力してください';
@@ -163,7 +189,7 @@ function App() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (validate()) {
       alert('送信成功！');
@@ -207,8 +233,17 @@ function App() {
 
 ラベル付きのInputコンポーネントを作ってください。
 
-```jsx
-function Input({ label, value, onChange, placeholder }) {
+```tsx
+import type { ChangeEvent } from 'react';
+
+type Props = {
+  label: string;
+  value: string;
+  onChange: (e: ChangeEvent<HTMLInputElement>) => void;
+  placeholder?: string;
+};
+
+function Input({ label, value, onChange, placeholder }: Props) {
   // ここにコードを書く
   // label と input を組み合わせる
 
@@ -238,8 +273,19 @@ type（`text`, `email`, `password`）を切り替えられ、エラーメッセ�
 4. `error`がある場合、ボーダーを赤くし、下にエラーメッセージを表示
 
 **ヒント:**
-```jsx
-function Input({ label, type = 'text', value, onChange, error, id }) {
+```tsx
+import type { ChangeEvent } from 'react';
+
+type Props = {
+  label: string;
+  type?: string;
+  value: string;
+  onChange: (e: ChangeEvent<HTMLInputElement>) => void;
+  error?: string;
+  id?: string;
+};
+
+function Input({ label, type = 'text', value, onChange, error, id }: Props) {
   // error の有無でボーダーの色を切り替える
   // error がある場合は <p> でメッセージを表示
 }
