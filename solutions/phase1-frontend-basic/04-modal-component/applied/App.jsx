@@ -1,0 +1,26 @@
+import { useState } from 'react';
+import Modal from './Modal';
+
+function App() {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+      <div className="text-center">
+        <h1 className="text-2xl font-bold text-white mb-6">04 応用: ESCキー + 外側クリック</h1>
+        <button
+          onClick={() => setIsOpen(true)}
+          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+        >
+          モーダルを開く
+        </button>
+        <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
+          <h2 className="text-lg font-bold mb-2">確認</h2>
+          <p className="text-gray-600">ESCキーまたは外側クリックで閉じられます。</p>
+        </Modal>
+      </div>
+    </div>
+  );
+}
+
+export default App;
