@@ -13,10 +13,16 @@ Modalは画面の前面にオーバーレイ付きでコンテンツを表示す
 
 ### 基本: オーバーレイ表示
 
-```jsx
-import { useState } from 'react';
+```tsx
+import { useState, type ReactNode } from 'react';
 
-function Modal({ isOpen, onClose, children }) {
+type Props = {
+  isOpen: boolean;
+  onClose: () => void;
+  children: ReactNode;
+};
+
+function Modal({ isOpen, onClose, children }: Props) {
   if (!isOpen) return null;
 
   return (
@@ -61,13 +67,19 @@ function App() {
 
 ### 応用: ESCキー + 外側クリックで閉じる
 
-```jsx
-import { useState, useEffect } from 'react';
+```tsx
+import { useState, useEffect, type ReactNode } from 'react';
 
-function Modal({ isOpen, onClose, children }) {
+type Props = {
+  isOpen: boolean;
+  onClose: () => void;
+  children: ReactNode;
+};
+
+function Modal({ isOpen, onClose, children }: Props) {
   // ESCキーで閉じる
   useEffect(() => {
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         onClose();
       }
@@ -134,13 +146,19 @@ function App() {
 
 ### 実践: スクロール防止 + アニメーション
 
-```jsx
-import { useState, useEffect } from 'react';
+```tsx
+import { useState, useEffect, type ReactNode } from 'react';
 
-function Modal({ isOpen, onClose, children }) {
+type Props = {
+  isOpen: boolean;
+  onClose: () => void;
+  children: ReactNode;
+};
+
+function Modal({ isOpen, onClose, children }: Props) {
   // ESCキーで閉じる
   useEffect(() => {
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         onClose();
       }
@@ -250,8 +268,16 @@ function App() {
 
 `isOpen`で表示/非表示を切り替えるModalコンポーネントを作ってください。
 
-```jsx
-function Modal({ isOpen, onClose, children }) {
+```tsx
+import type { ReactNode } from 'react';
+
+type Props = {
+  isOpen: boolean;
+  onClose: () => void;
+  children: ReactNode;
+};
+
+function Modal({ isOpen, onClose, children }: Props) {
   // ここにコードを書く
   // isOpen が false なら何も表示しない
   // オーバーレイ + モーダル本体 + 閉じるボタンを実装
@@ -278,9 +304,9 @@ function Modal({ isOpen, onClose, children }) {
 4. モーダルが閉じた後にイベントリスナーをクリーンアップする
 
 **ヒント:**
-```jsx
+```tsx
 useEffect(() => {
-  const handleKeyDown = (e) => {
+  const handleKeyDown = (e: KeyboardEvent) => {
     // ESCキーの判定
   };
   // addEventListener と return でクリーンアップ

@@ -13,10 +13,18 @@ Buttonは最も基本的なUIコンポーネントです。再利用可能なBut
 
 ### 基本: variant（見た目）の切り替え
 
-```jsx
-function Button({ variant = 'primary', children, onClick }) {
+```tsx
+import type { ReactNode } from 'react';
+
+type Props = {
+  variant?: 'primary' | 'secondary' | 'danger';
+  children: ReactNode;
+  onClick?: () => void;
+};
+
+function Button({ variant = 'primary', children, onClick }: Props) {
   // variantに応じたクラスを定義
-  const variantClasses = {
+  const variantClasses: Record<string, string> = {
     primary: 'bg-blue-600 text-white hover:bg-blue-700',
     secondary: 'bg-gray-200 text-gray-800 hover:bg-gray-300',
     danger: 'bg-red-600 text-white hover:bg-red-700',
@@ -46,15 +54,24 @@ function App() {
 
 ### 応用: size（サイズ）の追加
 
-```jsx
-function Button({ variant = 'primary', size = 'md', children, onClick }) {
-  const variantClasses = {
+```tsx
+import type { ReactNode } from 'react';
+
+type Props = {
+  variant?: 'primary' | 'secondary' | 'danger';
+  size?: 'sm' | 'md' | 'lg';
+  children: ReactNode;
+  onClick?: () => void;
+};
+
+function Button({ variant = 'primary', size = 'md', children, onClick }: Props) {
+  const variantClasses: Record<string, string> = {
     primary: 'bg-blue-600 text-white hover:bg-blue-700',
     secondary: 'bg-gray-200 text-gray-800 hover:bg-gray-300',
     danger: 'bg-red-600 text-white hover:bg-red-700',
   };
 
-  const sizeClasses = {
+  const sizeClasses: Record<string, string> = {
     sm: 'px-3 py-1 text-sm',
     md: 'px-4 py-2 text-base',
     lg: 'px-6 py-3 text-lg',
@@ -84,7 +101,19 @@ function App() {
 
 ### 実践: disabled状態とローディング状態の管理
 
-```jsx
+```tsx
+import { useState } from 'react';
+import type { ReactNode } from 'react';
+
+type Props = {
+  variant?: 'primary' | 'secondary' | 'danger';
+  size?: 'sm' | 'md' | 'lg';
+  disabled?: boolean;
+  isLoading?: boolean;
+  children: ReactNode;
+  onClick?: () => void;
+};
+
 function Button({
   variant = 'primary',
   size = 'md',
@@ -92,14 +121,14 @@ function Button({
   isLoading = false,
   children,
   onClick,
-}) {
-  const variantClasses = {
+}: Props) {
+  const variantClasses: Record<string, string> = {
     primary: 'bg-blue-600 text-white hover:bg-blue-700',
     secondary: 'bg-gray-200 text-gray-800 hover:bg-gray-300',
     danger: 'bg-red-600 text-white hover:bg-red-700',
   };
 
-  const sizeClasses = {
+  const sizeClasses: Record<string, string> = {
     sm: 'px-3 py-1 text-sm',
     md: 'px-4 py-2 text-base',
     lg: 'px-6 py-3 text-lg',
@@ -128,8 +157,6 @@ function Button({
 }
 
 // 使用例
-import { useState } from 'react';
-
 function App() {
   const [isLoading, setIsLoading] = useState(false);
 
@@ -157,8 +184,16 @@ function App() {
 
 3種類のvariant（`primary`, `secondary`, `outline`）を持つButtonコンポーネントを作ってください。
 
-```jsx
-function Button({ variant = 'primary', children, onClick }) {
+```tsx
+import type { ReactNode } from 'react';
+
+type Props = {
+  variant?: 'primary' | 'secondary' | 'outline';
+  children: ReactNode;
+  onClick?: () => void;
+};
+
+function Button({ variant = 'primary', children, onClick }: Props) {
   // ここにコードを書く
   // variant に応じてクラスを切り替える
 
@@ -189,8 +224,18 @@ variant（`primary`, `secondary`, `danger`）、size（`sm`, `md`, `lg`）、`di
 4. Tailwind CSSでスタイリング
 
 **ヒント:**
-```jsx
-function Button({ variant = 'primary', size = 'md', disabled = false, children, onClick }) {
+```tsx
+import type { ReactNode } from 'react';
+
+type Props = {
+  variant?: 'primary' | 'secondary' | 'danger';
+  size?: 'sm' | 'md' | 'lg';
+  disabled?: boolean;
+  children: ReactNode;
+  onClick?: () => void;
+};
+
+function Button({ variant = 'primary', size = 'md', disabled = false, children, onClick }: Props) {
   // variantClasses, sizeClasses をオブジェクトで定義
   // disabled の場合のスタイルも追加
 }

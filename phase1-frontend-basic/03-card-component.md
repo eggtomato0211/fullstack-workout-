@@ -13,8 +13,14 @@ Cardはコンテンツをグループ化して表示するためのコンポー�
 
 ### 基本: シンプルなCard
 
-```jsx
-function Card({ children }) {
+```tsx
+import type { ReactNode } from 'react';
+
+type Props = {
+  children: ReactNode;
+};
+
+function Card({ children }: Props) {
   return (
     <div className="bg-white rounded-lg shadow p-6">
       {children}
@@ -39,8 +45,14 @@ function App() {
 
 ### 応用: header/body/footer分離
 
-```jsx
-function Card({ children }) {
+```tsx
+import type { ReactNode } from 'react';
+
+type Props = {
+  children: ReactNode;
+};
+
+function Card({ children }: Props) {
   return (
     <div className="bg-white rounded-lg shadow overflow-hidden">
       {children}
@@ -48,7 +60,11 @@ function Card({ children }) {
   );
 }
 
-function CardHeader({ children }) {
+type SectionProps = {
+  children: ReactNode;
+};
+
+function CardHeader({ children }: SectionProps) {
   return (
     <div className="px-6 py-4 border-b border-gray-200">
       {children}
@@ -56,7 +72,7 @@ function CardHeader({ children }) {
   );
 }
 
-function CardBody({ children }) {
+function CardBody({ children }: SectionProps) {
   return (
     <div className="px-6 py-4">
       {children}
@@ -64,7 +80,7 @@ function CardBody({ children }) {
   );
 }
 
-function CardFooter({ children }) {
+function CardFooter({ children }: SectionProps) {
   return (
     <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
       {children}
@@ -97,9 +113,16 @@ function App() {
 
 ### 実践: variant（default/outlined/elevated）
 
-```jsx
-function Card({ variant = 'default', children }) {
-  const variantClasses = {
+```tsx
+import type { ReactNode } from 'react';
+
+type CardProps = {
+  variant?: 'default' | 'outlined' | 'elevated';
+  children: ReactNode;
+};
+
+function Card({ variant = 'default', children }: CardProps) {
+  const variantClasses: Record<string, string> = {
     default: 'bg-white shadow',
     outlined: 'bg-white border-2 border-gray-200',
     elevated: 'bg-white shadow-lg shadow-gray-200',
@@ -112,7 +135,11 @@ function Card({ variant = 'default', children }) {
   );
 }
 
-function CardHeader({ children }) {
+type SectionProps = {
+  children: ReactNode;
+};
+
+function CardHeader({ children }: SectionProps) {
   return (
     <div className="px-6 py-4 border-b border-gray-200">
       {children}
@@ -120,7 +147,7 @@ function CardHeader({ children }) {
   );
 }
 
-function CardBody({ children }) {
+function CardBody({ children }: SectionProps) {
   return (
     <div className="px-6 py-4">
       {children}
@@ -128,7 +155,7 @@ function CardBody({ children }) {
   );
 }
 
-function CardFooter({ children }) {
+function CardFooter({ children }: SectionProps) {
   return (
     <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
       {children}
@@ -177,8 +204,14 @@ function App() {
 
 `children`を受け取り、白背景・角丸・シャドウで囲むCardコンポーネントを作ってください。
 
-```jsx
-function Card({ children }) {
+```tsx
+import type { ReactNode } from 'react';
+
+type Props = {
+  children: ReactNode;
+};
+
+function Card({ children }: Props) {
   // ここにコードを書く
   // 白背景、角丸、シャドウを適用する
 
@@ -208,8 +241,15 @@ header/body/footer構造を持ち、variant（`default`, `outlined`, `elevated`�
 4. `CardHeader`と`CardFooter`にはボーダー（上下の区切り線）を付ける
 
 **ヒント:**
-```jsx
-function Card({ variant = 'default', children }) {
+```tsx
+import type { ReactNode } from 'react';
+
+type CardProps = {
+  variant?: 'default' | 'outlined' | 'elevated';
+  children: ReactNode;
+};
+
+function Card({ variant = 'default', children }: CardProps) {
   // variantClasses をオブジェクトで定義
   // variant に応じてクラスを切り替える
 }
