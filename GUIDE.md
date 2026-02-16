@@ -160,7 +160,28 @@ git commit -m "01-button-component の解答を追加"
 
 ---
 
-## 4. 環境一覧
+## 4. IDEの補完を有効にする
+
+workspace内のファイルでReactやTypeScriptの型補完を効かせるには、ホスト側にも`node_modules`が必要です。
+
+```bash
+# workspaceディレクトリに移動してインストール
+cd environments/frontend-basic/workspace
+npm install
+```
+
+これにより、VS Code等のIDEが以下を提供できるようになります:
+
+- React (`useState`, `useEffect`等) の型補完・ホバードキュメント
+- Tailwind CSSのクラス名補完（拡張機能が必要）
+- TypeScriptの型チェック・エラー表示
+- `import`文のパス補完
+
+> **補足:** Docker環境の`node_modules`はnamed volumeで管理されているため、ホスト側の`node_modules`はIDEの補完専用です。コンテナ内の実行には影響しません。
+
+---
+
+## 5. 環境一覧
 
 | Phase | 環境ディレクトリ | 技術スタック | ポート |
 |---|---|---|---|

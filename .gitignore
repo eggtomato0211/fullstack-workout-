@@ -1,7 +1,3 @@
-# Workspace directories (created per-session)
-**/workspace/
-!**/workspace/.gitkeep
-
 # Dependencies
 node_modules/
 
