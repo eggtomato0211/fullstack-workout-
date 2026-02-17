@@ -6,7 +6,3 @@ postgres-data/
 
 # OS
 .DS_Store
-
-# Environment workspaces (ephemeral user work)
-environments/*/workspace/*
-!environments/*/workspace/.gitkeep
