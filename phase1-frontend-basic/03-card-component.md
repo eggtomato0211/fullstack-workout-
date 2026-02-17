@@ -19,6 +19,7 @@ Cardはコンテンツをグループ化して表示するためのコンポー�
 **実務での活用場面:** ECサイトの商品一覧、ダッシュボードの統計パネル、SNSの投稿フィード、管理画面のデータ表示、プロフィールカードなど。Webアプリケーションのあらゆる一覧画面・詳細表示で使われる最頻出のレイアウトパターンです。
 
 **よくある誤解:**
+
 - ❌ 「Cardは見た目だけの問題」→ header/body/footerの構造化がコンテンツの意味を明確にする
 - ❌ 「childrenに全部入れればいい」→ 領域を分けることで再利用性とレイアウトの一貫性が向上する
 - ❌ 「variantはclassNameを直接渡せばいい」→ 定義済みvariantで統一的なデザインを維持する
@@ -27,6 +28,8 @@ Cardはコンテンツをグループ化して表示するためのコンポー�
 
 ### 基本: シンプルなCard
 
+まずは最もシンプルなCardから始めます。Cardの本質は「コンテンツを視覚的に1つのグループとして囲む」ことです。白背景・角丸・シャドウの3つを組み合わせることで、背景から浮き上がった「カード」の見た目を作り、ユーザーに「ここが1つの情報のまとまりである」と伝えます。`children`で中身を自由に差し込める設計にすることで、どんなコンテンツにも対応できる汎用的なコンポーネントになります。
+
 ```tsx
 import type { ReactNode } from 'react';
 
@@ -34,15 +37,16 @@ type Props = {
   children: ReactNode;
 };
 
+// childrenで中身を受け取ることで、Card自体はレイアウトの責務だけを持つ
 function Card({ children }: Props) {
   return (
+    // shadow + rounded-lg で「浮いたカード」の視覚効果を作る
     <div className="bg-white rounded-lg shadow p-6">
       {children}
     </div>
   );
 }
 
-// 使用例
 function App() {
   return (
     <div className="p-4 max-w-sm">
@@ -57,7 +61,11 @@ function App() {
 }
 ```
 
+> **💡 次のステップへ:** シンプルなCardは便利ですが、タイトル・本文・アクションボタンが全て同じ領域に混在しています。次のステージでは、これらを header / body / footer に分離して、コンテンツの役割を構造的に明確にします。
+
 ### 応用: header/body/footer分離
+
+Cardの中身をheader（タイトル領域）、body（メインコンテンツ）、footer（アクション領域）の3つのサブコンポーネントに分割します。こうすることで、各領域の役割が明確になり、ボーダーや背景色で視覚的な区切りも付けられます。親のCardに`overflow-hidden`を付けるのは、子要素のコンテンツが角丸からはみ出すのを防ぐためです。
 
 ```tsx
 import type { ReactNode } from 'react';
@@ -68,6 +76,8 @@ type Props = {
 
 function Card({ children }: Props) {
   return (
+    // overflow-hidden: 子要素（画像など）が角丸の外にはみ出すのを防ぐ
+    // p-6 を外して各セクションに余白を委譲し、ボーダーが端まで届くようにする
     <div className="bg-white rounded-lg shadow overflow-hidden">
       {children}
     </div>
@@ -78,6 +88,7 @@ type SectionProps = {
   children: ReactNode;
 };
 
+// border-b でbodyとの境界線を作り、「ここがタイトル領域」と視覚的に伝える
 function CardHeader({ children }: SectionProps) {
   return (
     <div className="px-6 py-4 border-b border-gray-200">
@@ -86,6 +97,7 @@ function CardHeader({ children }: SectionProps) {
   );
 }
 
+// bodyは境界線なし。メインコンテンツが自然に広がる領域
 function CardBody({ children }: SectionProps) {
   return (
     <div className="px-6 py-4">
@@ -94,6 +106,7 @@ function CardBody({ children }: SectionProps) {
   );
 }
 
+// border-t + bg-gray-50 でアクション領域を視覚的に分離し、操作可能な場所だと示す
 function CardFooter({ children }: SectionProps) {
   return (
     <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
@@ -102,7 +115,6 @@ function CardFooter({ children }: SectionProps) {
   );
 }
 
-// 使用例
 function App() {
   return (
     <div className="p-4 max-w-sm">
@@ -125,21 +137,28 @@ function App() {
 }
 ```
 
+> **💡 次のステップへ:** 構造は整いましたが、現状では全てのCardが同じ見た目です。実際のアプリケーションでは、文脈に応じてCardの外観を切り替えたい場面があります（例: 通常表示、軽い囲み、強調表示）。次のステージでは variant props を導入して、見た目のバリエーションを型安全に管理する方法を学びます。
+
 ### 実践: variant（default/outlined/elevated）
+
+Buttonコンポーネントと同様に、Cardにも`variant` propsを導入します。見た目の切り替えロジックをオブジェクトマッピングで管理することで、新しいvariantの追加が容易になり、コンポーネント利用側は`variant="outlined"`と指定するだけで統一されたデザインを適用できます。TypeScriptのユニオン型で許可されるvariantを制限しているため、タイポや未定義のvariantを使おうとするとコンパイル時にエラーになります。
 
 ```tsx
 import type { ReactNode } from 'react';
 
 type CardProps = {
+  // ユニオン型でvariantを制限し、未定義の値を渡せないようにする
   variant?: 'default' | 'outlined' | 'elevated';
   children: ReactNode;
 };
 
 function Card({ variant = 'default', children }: CardProps) {
+  // variantごとのクラスをオブジェクトで一元管理
+  // 新しいvariantを追加する際もここに1行足すだけで済む
   const variantClasses: Record<string, string> = {
     default: 'bg-white shadow',
-    outlined: 'bg-white border-2 border-gray-200',
-    elevated: 'bg-white shadow-lg shadow-gray-200',
+    outlined: 'bg-white border-2 border-gray-200',  // シャドウの代わりにボーダーで囲む
+    elevated: 'bg-white shadow-lg shadow-gray-200',  // より強いシャドウで浮遊感を強調
   };
 
   return (
@@ -177,10 +196,10 @@ function CardFooter({ children }: SectionProps) {
   );
 }
 
-// 使用例
 function App() {
   return (
     <div className="p-4 max-w-md space-y-6">
+      {/* default: 一般的な情報表示に使う標準スタイル */}
       <Card variant="default">
         <CardHeader>
           <h2 className="font-bold">Default</h2>
@@ -190,6 +209,7 @@ function App() {
         </CardBody>
       </Card>
 
+      {/* outlined: シャドウを使わず軽い印象にしたい場面向け */}
       <Card variant="outlined">
         <CardHeader>
           <h2 className="font-bold">Outlined</h2>
@@ -199,6 +219,7 @@ function App() {
         </CardBody>
       </Card>
 
+      {/* elevated: 注目させたい重要な情報やCTA向け */}
       <Card variant="elevated">
         <CardHeader>
           <h2 className="font-bold">Elevated</h2>
@@ -214,47 +235,17 @@ function App() {
 
 ## 🎯 演習問題
 
-### 基本: シンプルなCardの実装
-
-`children`を受け取り、白背景・角丸・シャドウで囲むCardコンポーネントを作ってください。
-
-```tsx
-import type { ReactNode } from 'react';
-
-type Props = {
-  children: ReactNode;
-};
-
-function Card({ children }: Props) {
-  // ここにコードを書く
-  // 白背景、角丸、シャドウを適用する
-
-  return (
-    <div>
-      {children}
-    </div>
-  );
-}
-```
-
-**期待される動作:**
-- 白背景で角丸のカードが表示される
-- シャドウがついて浮いて見える
-- 内側にパディングがある
-
----
-
-### 応用: header/body/footer + variant
-
 header/body/footer構造を持ち、variant（`default`, `outlined`, `elevated`）を切り替えられるCardコンポーネント群を作ってください。
 
 **要件:**
+
 1. `Card`, `CardHeader`, `CardBody`, `CardFooter` の4つのコンポーネントを作成
 2. `Card`は`variant`をpropsで受け取る（デフォルト: `default`）
 3. `default`: 通常のシャドウ、`outlined`: ボーダー表示、`elevated`: 強いシャドウ
 4. `CardHeader`と`CardFooter`にはボーダー（上下の区切り線）を付ける
 
 **ヒント:**
+
 ```tsx
 import type { ReactNode } from 'react';
 
@@ -267,31 +258,6 @@ function Card({ variant = 'default', children }: CardProps) {
   // variantClasses をオブジェクトで定義
   // variant に応じてクラスを切り替える
 }
-```
-
----
-
-### 発展: 画像付きカード + アクションボタン
-
-商品カードを作成してください。
-
-**要件:**
-1. カード上部に画像エリア（`<img>`タグ、高さ固定）
-2. body部分に商品名（太字）と説明文
-3. footer部分に価格表示と「カートに追加」ボタン
-4. variant（`default`, `outlined`）を切り替え可能
-5. 使用例としてAppコンポーネントで2つの商品カードを横に並べる
-
-**完成イメージ:**
-```
-┌──────────────────┐
-│   [商品画像]      │
-├──────────────────┤
-│ 商品名            │
-│ 説明テキスト...    │
-├──────────────────┤
-│ ¥1,980   [カートに追加] │
-└──────────────────┘
 ```
 
 ## ✅ 重要ポイント

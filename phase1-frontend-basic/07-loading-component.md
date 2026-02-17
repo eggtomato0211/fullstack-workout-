@@ -19,6 +19,7 @@ Loading系コンポーネントは、データ取得や処理の待ち時間に�
 **実務での活用場面:** API通信中のSpinner、一覧ページ読み込み時のSkeleton（Twitter/Xのタイムライン、YouTubeのサムネイル一覧）、ファイルアップロード時のProgress Bar、ダッシュボードの初期読み込みなど。特にSkeletonはNext.jsの`loading.tsx`やReactのSuspenseと組み合わせて使うパターンが普及しています。
 
 **よくある誤解:**
+
 - ❌ 「Spinnerだけあれば十分」→ コンテンツの形が予測できる場合はSkeletonの方がUXが良い（体感速度の向上）
 - ❌ 「ローディング中は何も表示しなくていい」→ フィードバックがないとユーザーはフリーズと誤解する
 - ❌ 「Progress Barの値は適当でいい」→ 実際の進捗に基づかない嘘のプログレスはユーザーの信頼を損なう
@@ -27,12 +28,16 @@ Loading系コンポーネントは、データ取得や処理の待ち時間に�
 
 ### 基本: Spinner
 
+Spinnerはローディング表示の最も基本的なパターンです。CSSの`animate-spin`だけで回転アニメーションを実現できるため、実装コストが低く汎用的に使えます。`size`プロパティを用意しておくことで、ボタン内の小さなインジケーターからページ全体のローディングまで、1つのコンポーネントで対応できるようにしています。
+
 ```tsx
 type Props = {
   size?: 'sm' | 'md' | 'lg';
 };
 
 function Spinner({ size = 'md' }: Props) {
+  // サイズごとにTailwindクラスをマッピング。borderの太さもサイズに比例させることで、
+  // どのサイズでも視覚的なバランスが保たれる
   const sizeClasses: Record<string, string> = {
     sm: 'h-4 w-4 border-2',
     md: 'h-8 w-8 border-3',
@@ -40,16 +45,19 @@ function Spinner({ size = 'md' }: Props) {
   };
 
   return (
+    // role="status"を付与することで、スクリーンリーダーがこの領域を
+    // ライブリージョンとして認識し、状態変化を読み上げてくれる
     <div role="status">
+      {/* border-t-transparent で上辺だけ透明にし、回転時に「切れ目」が見える仕組み */}
       <div
         className={`animate-spin rounded-full border-blue-600 border-t-transparent ${sizeClasses[size]}`}
       />
+      {/* 視覚的には非表示だが、スクリーンリーダーには「読み込み中」と伝わる */}
       <span className="sr-only">読み込み中...</span>
     </div>
   );
 }
 
-// 使用例
 function App() {
   return (
     <div className="p-4 flex items-center gap-6">
@@ -61,7 +69,11 @@ function App() {
 }
 ```
 
+> **💡 次のステップへ:** Spinnerは「何かが読み込まれている」ことは伝わりますが、最終的にどんなコンテンツが表示されるかは分かりません。次のSkeletonでは、コンテンツの「形」を先に見せることで、ユーザーの体感待ち時間を短縮するアプローチを学びます。
+
 ### 応用: Skeleton
+
+Skeletonはコンテンツが表示される前にその「骨格」をグレーのブロックで描画するパターンです。ユーザーに最終的なレイアウトを予測させることで、Spinnerよりも体感速度が向上します。汎用的な`Skeleton`コンポーネントを1つ作り、`width`・`height`・`rounded`を外から指定できるようにすることで、カードやリストなどあらゆるレイアウトに再利用できます。
 
 ```tsx
 type SkeletonProps = {
@@ -71,6 +83,7 @@ type SkeletonProps = {
 };
 
 function Skeleton({ width, height, rounded = 'md' }: SkeletonProps) {
+  // 角丸のバリエーションをマッピング。アバター用にfull（円形）も用意しておく
   const roundedClasses: Record<string, string> = {
     none: 'rounded-none',
     sm: 'rounded-sm',
@@ -80,6 +93,8 @@ function Skeleton({ width, height, rounded = 'md' }: SkeletonProps) {
   };
 
   return (
+    // animate-pulseで明滅させることで「まだ読み込み中」であることを視覚的に伝える。
+    // classNameではなくstyleでサイズを指定するのは、任意のピクセル値やパーセント値に対応するため
     <div
       className={`bg-gray-200 animate-pulse ${roundedClasses[rounded]}`}
       style={{ width, height }}
@@ -87,10 +102,12 @@ function Skeleton({ width, height, rounded = 'md' }: SkeletonProps) {
   );
 }
 
+// 実際のカードUIと同じレイアウト構造でSkeletonを配置する。
+// こうすることで、データ到着後にレイアウトがガタッとずれる（レイアウトシフト）を防げる
 function CardSkeleton() {
   return (
     <div className="bg-white rounded-lg shadow p-6 max-w-sm">
-      {/* アバター */}
+      {/* アバター + ユーザー名エリア：実際のカードと同じflex配置にする */}
       <div className="flex items-center gap-4 mb-4">
         <Skeleton width="48px" height="48px" rounded="full" />
         <div className="space-y-2">
@@ -98,7 +115,7 @@ function CardSkeleton() {
           <Skeleton width="80px" height="12px" />
         </div>
       </div>
-      {/* テキスト行 */}
+      {/* 本文テキストエリア：最後の行だけ短くして、自然なテキストの終端を表現 */}
       <div className="space-y-2">
         <Skeleton width="100%" height="14px" />
         <Skeleton width="100%" height="14px" />
@@ -108,7 +125,6 @@ function CardSkeleton() {
   );
 }
 
-// 使用例
 function App() {
   return (
     <div className="p-4 space-y-6">
@@ -119,7 +135,11 @@ function App() {
 }
 ```
 
+> **💡 次のステップへ:** Spinnerは「処理中」、Skeletonは「コンテンツの形を予告」しますが、どちらも「あとどれくらいかかるか」は伝えられません。次のProgress Barでは、進捗を数値で可視化してユーザーに安心感を与える方法を学びます。
+
 ### 実践: Progress Bar
+
+Progress Barは処理の進捗を数値（パーセンテージ）で表示するパターンです。ファイルアップロードやデータ取得のように「全体の何%が完了したか」が分かる処理で使います。`value`と`max`を受け取る設計にしておくことで、0-100だけでなく「5/20件処理済み」のような任意のスケールにも対応できます。ここでは`setTimeout`で段階的に進捗を更新するシミュレーションも組み合わせ、実際のデータ取得フローに近い体験を実装します。
 
 ```tsx
 import { useState } from 'react';
@@ -131,6 +151,8 @@ type ProgressBarProps = {
 };
 
 function ProgressBar({ value, max = 100, label }: ProgressBarProps) {
+  // Math.min/Maxで0〜100%の範囲にクランプする。
+  // 外から不正な値（負数や超過値）が渡されてもUIが壊れないようにする防御的な処理
   const percentage = Math.min(Math.max((value / max) * 100, 0), 100);
 
   return (
@@ -141,7 +163,10 @@ function ProgressBar({ value, max = 100, label }: ProgressBarProps) {
           <span className="text-sm text-gray-500">{Math.round(percentage)}%</span>
         </div>
       )}
+      {/* overflow-hiddenで内側のバーが角丸からはみ出すのを防ぐ */}
       <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+        {/* transition-allにより、widthが変わるたびに滑らかにアニメーションする。
+            これがないとバーがカクカク飛んでしまい、体験が悪くなる */}
         <div
           className="bg-blue-600 h-full rounded-full transition-all duration-300"
           style={{ width: `${percentage}%` }}
@@ -151,7 +176,6 @@ function ProgressBar({ value, max = 100, label }: ProgressBarProps) {
   );
 }
 
-// 使用例: データ取得と連動
 function App() {
   const [progress, setProgress] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -162,12 +186,15 @@ function App() {
     setProgress(0);
     setData(null);
 
-    // 段階的に進捗を更新するシミュレーション
+    // 実際のAPI通信では進捗イベント（onUploadProgressなど）を使うが、
+    // ここではsetTimeoutで段階的に進捗を更新するシミュレーションを行う
     const steps = [20, 50, 75, 90, 100];
     steps.forEach((step, index) => {
       setTimeout(() => {
         setProgress(step);
         if (step === 100) {
+          // 100%到達後に少し間を置いてから完了表示にする。
+          // すぐ消すとユーザーが「100%」を認識できないため
           setTimeout(() => {
             setData('データの読み込みが完了しました！');
             setIsLoading(false);
@@ -201,48 +228,17 @@ function App() {
 
 ## 🎯 演習問題
 
-### 基本: Spinnerの実装
-
-3サイズ（`sm`, `md`, `lg`）に対応するSpinnerコンポーネントを作ってください。
-
-```tsx
-type Props = {
-  size?: 'sm' | 'md' | 'lg';
-};
-
-function Spinner({ size = 'md' }: Props) {
-  // ここにコードを書く
-  // size に応じてサイズを切り替える
-  // CSSアニメーション（animate-spin）で回転させる
-
-  return (
-    <div role="status">
-      {/* スピナー要素 */}
-    </div>
-  );
-}
-```
-
-**期待される動作:**
-- `sm`: 小さいスピナー（16px）
-- `md`: 標準スピナー（32px）
-- `lg`: 大きいスピナー（48px）
-- 回転アニメーションが常に動いている
-- `role="status"`でアクセシビリティに配慮
-
----
-
-### 応用: Skeletonの実装
-
 幅・高さ・角丸を指定できるSkeletonコンポーネントと、それを組み合わせたCardSkeletonを作ってください。
 
 **要件:**
+
 1. `Skeleton`は`width`, `height`, `rounded`をpropsで受け取る
 2. パルスアニメーション（`animate-pulse`）でローディング感を表現
 3. `CardSkeleton`はアバター（丸型）+ テキスト行3行で構成
 4. 実際のカードコンテンツと同じレイアウトでSkeletonを配置
 
 **ヒント:**
+
 ```tsx
 type Props = {
   width: string;
@@ -254,31 +250,6 @@ function Skeleton({ width, height, rounded = 'md' }: Props) {
   // bg-gray-200 + animate-pulse でパルスアニメーション
   // style={{ width, height }} でサイズ指定
 }
-```
-
----
-
-### 発展: Progress Bar + データ取得連動
-
-Progress Barコンポーネントを作成し、データ取得のシミュレーションと連動させてください。
-
-**要件:**
-1. `value`（現在値）と`max`（最大値、デフォルト100）をpropsで受け取る
-2. ラベルと現在のパーセンテージを表示
-3. バーの幅を`value/max`のパーセンテージで制御
-4. ボタンクリックでデータ取得をシミュレーション（`setTimeout`で段階的に進捗更新）
-5. 100%到達時に完了メッセージを表示
-
-**完成イメージ:**
-```
-[データを取得]
-
-データ取得中                         75%
-[██████████████████░░░░░░]
-
-↓ 完了後
-
-データの読み込みが完了しました！
 ```
 
 ## ✅ 重要ポイント
