@@ -181,10 +181,126 @@ npm install
 
 ---
 
-## 5. 環境一覧
+## 5. Phase 3-4 (Go) の場合
+
+### 起動方法
+
+```bash
+# 環境ディレクトリに移動
+cd environments/backend
+
+# 初回起動（イメージのビルド + コンテナ起動）
+docker compose up --build
+
+# 2回目以降の起動
+docker compose up
+
+# バックグラウンドで起動する場合
+docker compose up -d
+
+# ログを確認（バックグラウンド起動時）
+docker compose logs -f
+
+# 停止
+docker compose stop
+
+# 停止 + コンテナ削除
+docker compose down
+```
+
+**カテゴリH以降（DB必要時）:**
+
+```bash
+# DBも一緒に起動する場合（profileを指定）
+docker compose --profile db up --build
+```
+
+### 構成図
+
+```
+ホストマシン                         Dockerコンテナ
+┌──────────────────────┐           ┌──────────────────┐
+│ environments/        │           │                  │
+│   backend/           │           │  /app/           │
+│     workspace/  ────────(マウント)────→  (Goプロジェクト)  │
+│       main.go        │           │    main.go       │
+│       go.mod         │           │    go.mod        │
+│       .air.toml      │           │    tmp/ (ビルド)  │
+│                      │           │                  │
+│ ターミナル出力 ←──────────(ログ)──────── Air (hot reload) │
+└──────────────────────┘           └──────────────────┘
+```
+
+- `workspace/` をコンテナ内の `/app` にマウント
+- ホストで `workspace/main.go` を編集 → Air が自動検知 → 再ビルド＆実行
+- `go run .` の代わりに Air が自動でホットリロードしてくれる
+
+### ワークフロー（Go版）
+
+#### 1. 問題を解く
+
+`workspace/main.go` を編集する。カテゴリAの問題は全て単一ファイルで完結。
+
+```
+workspace/
+├── main.go     # ← ここを編集（問題ごとに書き換え）
+├── go.mod      # モジュール定義（変更不要）
+└── .air.toml   # Air設定（変更不要）
+```
+
+#### 2. 実行して確認
+
+Air が自動で再ビルド＆実行するので、ファイルを保存するだけでOK。
+手動で実行したい場合:
+
+```bash
+# コンテナ内でGoコマンドを直接実行
+docker compose exec app go run .
+
+# コンテナのシェルに入る
+docker compose exec app sh
+```
+
+#### 3. 解答を保存する
+
+```bash
+# 例: 01-struct-and-embedding の基本レベル解答を保存
+mkdir -p solutions/phase3-backend-basic/01-struct-and-embedding/basic
+cp environments/backend/workspace/main.go \
+   solutions/phase3-backend-basic/01-struct-and-embedding/basic/main.go
+```
+
+#### 4. 次の問題に進む
+
+`workspace/main.go` を次の問題のコードで上書きすればOK。
+
+### コンテナ内でコマンドを実行したい場合
+
+```bash
+# コンテナのシェルに入る
+docker compose exec app sh
+
+# 直接コマンドを実行
+docker compose exec app go run .
+docker compose exec app go test ./...
+docker compose exec app go fmt ./...
+```
+
+### よくあるトラブル
+
+| 症状 | 対処法 |
+|---|---|
+| `air: command not found` | `docker compose down && docker compose up --build` で再ビルド |
+| ビルドエラーが出る | `docker compose logs` でエラー内容を確認 |
+| ホットリロードが効かない | `docker compose restart` |
+| パッケージが見つからない | コンテナ内で `go mod tidy` を実行 |
+
+---
+
+## 6. 環境一覧
 
 | Phase | 環境ディレクトリ | 技術スタック | ポート |
 |---|---|---|---|
 | Phase 1 | `environments/frontend-basic/` | Vite + React + Tailwind CSS + TypeScript | 3000 |
 | Phase 2 | `environments/frontend-advanced/` | Next.js (予定) | - |
-| Phase 3-4 | `environments/backend/` | Go (予定) | - |
+| Phase 3-4 | `environments/backend/` | Go 1.21 + Air (hot reload) + PostgreSQL | 8080 |

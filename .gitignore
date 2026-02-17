@@ -4,5 +4,8 @@ node_modules/
 # Database
 postgres-data/
 
+# Go workspace (Air hot reload temp)
+environments/backend/workspace/tmp/
+
 # OS
 .DS_Store

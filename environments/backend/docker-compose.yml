@@ -1,4 +1,16 @@
 services:
+  # Go実行環境（カテゴリA-G: DB不要）
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./workspace:/app
+    environment:
+      - GO_ENV=development
+
+  # DB付き環境（カテゴリH以降: DB必要時に使用）
+  # 起動方法: docker compose --profile db up
   api:
     build: .
     ports:
@@ -6,6 +18,7 @@ services:
     volumes:
       - ./workspace:/app
     environment:
+      - GO_ENV=development
       - DB_HOST=db
       - DB_PORT=5432
       - DB_USER=postgres
@@ -15,6 +28,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    profiles:
+      - db
 
   db:
     image: postgres:16-alpine
@@ -31,6 +46,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    profiles:
+      - db
 
 volumes:
   postgres-data:
