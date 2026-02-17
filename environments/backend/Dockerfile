@@ -1,4 +1,4 @@
-FROM golang:1.21-alpine
+FROM golang:1.24-alpine
 
 WORKDIR /app
 
@@ -6,6 +6,7 @@ WORKDIR /app
 RUN apk add --no-cache git curl gcc musl-dev
 
 # Install Air (hot reload)
+ENV GOTOOLCHAIN=auto
 RUN go install github.com/air-verse/air@latest
 
 # Install golang-migrate
