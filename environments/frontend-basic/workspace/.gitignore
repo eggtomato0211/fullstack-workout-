@@ -22,7 +22,3 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-
-# User exercise code (ephemeral, not tracked)
-src/App.tsx
-src/components/

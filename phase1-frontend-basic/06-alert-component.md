@@ -19,6 +19,7 @@ Alertはユーザーに状態や結果を伝えるための通知コンポーネ
 **実務での活用場面:** フォーム送信後の成功/エラー通知、システム障害の警告バナー、新機能のお知らせ、入力バリデーションの結果表示など。Toast通知（画面端に表示される一時通知）はAlertの発展形で、SaaS系アプリではほぼ必須の機能です。
 
 **よくある誤解:**
+
 - ❌ 「色だけ変えれば伝わる」→ アイコンとテキストも併用し、色覚に頼らない情報伝達が重要
 - ❌ 「エラーも成功も同じ見た目でいい」→ variant別の色・アイコンで直感的に状態を区別させる
 - ❌ 「表示したら消す必要はない」→ 成功通知などは自動消去するとUXが向上する
@@ -26,6 +27,8 @@ Alertはユーザーに状態や結果を伝えるための通知コンポーネ
 ## 💡 コード例
 
 ### 基本: 4種類のAlert
+
+まずは最もシンプルな形から始めます。variantごとのスタイルを`Record`オブジェクトで一元管理することで、条件分岐（if/switch）を使わずにスタイルを切り替えられます。この「データ駆動」のアプローチは、variantが増えてもオブジェクトに1行追加するだけで済むため、保守性が高くなります。
 
 ```tsx
 import type { ReactNode } from 'react';
@@ -38,6 +41,8 @@ type Props = {
 };
 
 function Alert({ variant = 'info', children }: Props) {
+  // variantとクラス名の対応をオブジェクトで管理することで、
+  // if/switchを使わず、新しいvariant追加時も1行で済む
   const variantClasses: Record<Variant, string> = {
     success: 'bg-green-50 border-green-500 text-green-800',
     warning: 'bg-yellow-50 border-yellow-500 text-yellow-800',
@@ -48,6 +53,7 @@ function Alert({ variant = 'info', children }: Props) {
   return (
     <div
       className={`border-l-4 px-4 py-3 rounded ${variantClasses[variant]}`}
+      // role="alert"でスクリーンリーダーに「これは通知である」と伝える
       role="alert"
     >
       {children}
@@ -68,7 +74,11 @@ function App() {
 }
 ```
 
+> **💡 次のステップへ:** 基本のAlertは色とテキストだけで状態を伝えていますが、色覚に課題のあるユーザーには色の違いが判別しにくい場合があります。次のステップでは、アイコンを追加して色に頼らない情報伝達を実現します。
+
 ### 応用: アイコン付きAlert
+
+色だけでなくアイコンを併用することで、WCAG（Webアクセシビリティガイドライン）の「色だけに依存しない情報伝達」を満たします。アイコン用のスタイルも`Record`オブジェクトで管理し、variantClasses・icons・iconClassesの3つのオブジェクトを同じキーで揃えることで、不整合が起きにくい構造にしています。
 
 ```tsx
 import type { ReactNode } from 'react';
@@ -88,6 +98,8 @@ function Alert({ variant = 'info', children }: Props) {
     info: 'bg-blue-50 border-blue-500 text-blue-800',
   };
 
+  // 色覚に頼らず状態を伝えるためのアイコン
+  // 実務ではreact-iconsやheroiconsなどのライブラリを使うことが多い
   const icons: Record<Variant, string> = {
     success: '✓',
     warning: '⚠',
@@ -95,6 +107,7 @@ function Alert({ variant = 'info', children }: Props) {
     info: 'ℹ',
   };
 
+  // アイコン背景色をvariantに合わせることで視覚的一貫性を保つ
   const iconClasses: Record<Variant, string> = {
     success: 'bg-green-500',
     warning: 'bg-yellow-500',
@@ -107,6 +120,7 @@ function Alert({ variant = 'info', children }: Props) {
       className={`border-l-4 px-4 py-3 rounded flex items-center gap-3 ${variantClasses[variant]}`}
       role="alert"
     >
+      {/* flex-shrink-0でアイコンがテキスト量に応じて潰れるのを防ぐ */}
       <span
         className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-white text-sm ${iconClasses[variant]}`}
       >
@@ -130,7 +144,11 @@ function App() {
 }
 ```
 
+> **💡 次のステップへ:** 見た目は整いましたが、実際のアプリでは通知を「閉じる」「一定時間で消える」といったインタラクションが求められます。次のステップでは、`onClose`コールバックによる手動消去と、`useEffect` + `setTimeout`による自動消去を組み合わせた実践的な通知システムを作ります。
+
 ### 実践: 閉じるボタン + 自動消去
+
+実際のアプリケーションでは、通知は動的に追加・削除されるものです。ここでは配列stateで複数の通知を管理し、手動（閉じるボタン）と自動（タイマー）の両方で削除できる仕組みを作ります。`useEffect`のクリーンアップ関数で`clearTimeout`することで、コンポーネントがアンマウントされたときにタイマーが残り続ける（メモリリーク）問題を防いでいます。
 
 ```tsx
 import { useState, useEffect, type ReactNode } from 'react';
@@ -166,7 +184,9 @@ function Alert({ variant = 'info', children, onClose, autoClose = 0 }: Props) {
     info: 'bg-blue-500',
   };
 
-  // 自動消去
+  // autoCloseが指定されている場合、指定ミリ秒後にonCloseを呼ぶ
+  // クリーンアップでclearTimeoutすることで、コンポーネントが
+  // アンマウントされた後にonCloseが呼ばれるのを防ぐ（メモリリーク対策）
   useEffect(() => {
     if (autoClose > 0 && onClose) {
       const timer = setTimeout(onClose, autoClose);
@@ -184,7 +204,9 @@ function Alert({ variant = 'info', children, onClose, autoClose = 0 }: Props) {
       >
         {icons[variant]}
       </span>
+      {/* flex-1でテキスト部分が残りスペースを埋め、閉じるボタンを右端に押しやる */}
       <span className="flex-1">{children}</span>
+      {/* onCloseが渡された場合のみ閉じるボタンを表示（条件付きレンダリング） */}
       {onClose && (
         <button
           onClick={onClose}
@@ -211,10 +233,13 @@ function App() {
     { id: 2, variant: 'error', message: 'エラーが発生しました。', autoClose: 0 },
   ]);
 
+  // filterで該当idを除外した新配列を作ることで、イミュータブルに削除する
   const removeAlert = (id: number) => {
     setAlerts((prev) => prev.filter((alert) => alert.id !== id));
   };
 
+  // Date.now()をidに使うことで、簡易的にユニークなキーを生成する
+  // 本番ではuuidなどの衝突しにくいID生成を推奨
   const addAlert = () => {
     const newAlert: AlertItem = {
       id: Date.now(),
@@ -222,6 +247,7 @@ function App() {
       message: `新しい通知です（${new Date().toLocaleTimeString()}）`,
       autoClose: 5000,
     };
+    // スプレッド構文で既存配列を展開し、末尾に新要素を追加（イミュータブル更新）
     setAlerts((prev) => [...prev, newAlert]);
   };
 
@@ -253,52 +279,17 @@ function App() {
 
 ## 🎯 演習問題
 
-### 基本: 4種類のvariant
-
-4種類のvariant（`success`, `warning`, `error`, `info`）に対応するAlertコンポーネントを作ってください。
-
-```tsx
-import type { ReactNode } from 'react';
-
-type Variant = 'success' | 'warning' | 'error' | 'info';
-
-type Props = {
-  variant?: Variant;
-  children: ReactNode;
-};
-
-function Alert({ variant = 'info', children }: Props) {
-  // ここにコードを書く
-  // variant に応じて背景色・ボーダー色・文字色を切り替える
-
-  return (
-    <div role="alert">
-      {children}
-    </div>
-  );
-}
-```
-
-**期待される動作:**
-- `success`: 緑系の配色
-- `warning`: 黄色系の配色
-- `error`: 赤系の配色
-- `info`: 青系の配色
-- 左側にボーダー（`border-l-4`）が表示される
-
----
-
-### 応用: アイコン + 閉じるボタン
-
 基本のAlertにアイコンと閉じるボタンを追加してください。
 
 **要件:**
+
 1. 各variantに対応するアイコンを左側に表示（✓ / ⚠ / ✕ / ℹ）
 2. アイコンは丸い背景付き（variant色）で白文字
 3. `onClose`がpropsで渡された場合のみ、右端に閉じるボタン（✕）を表示
 4. 閉じるボタンクリックで`onClose`コールバックを呼ぶ
 
 **ヒント:**
+
 ```tsx
 import type { ReactNode } from 'react';
 
@@ -314,28 +305,6 @@ function Alert({ variant = 'info', children, onClose }: Props) {
   // icons オブジェクトで variant ごとのアイコンを定義
   // onClose が存在する場合のみ閉じるボタンを表示
 }
-```
-
----
-
-### 発展: 自動消去 + Toast風通知
-
-Alertを活用した通知システムを作成してください。
-
-**要件:**
-1. 「通知を追加」ボタンで新しいAlertを画面に追加
-2. 各Alertは`autoClose`（ミリ秒）を指定でき、時間経過で自動消去する
-3. 手動で閉じるボタンでも消去可能
-4. 複数のAlertを同時に表示（縦に積む）
-5. Alertの追加時にvariantをランダムに選択する
-
-**完成イメージ:**
-```
-[通知を追加]
-
-┌ ✓ 保存が完了しました。          ✕ ┐  ← 3秒後に自動消去
-├ ⚠ 入力内容を確認してください。  ✕ ┤
-└ ℹ 新しい通知です (12:34:56)    ✕ ┘  ← 5秒後に自動消去
 ```
 
 ## ✅ 重要ポイント

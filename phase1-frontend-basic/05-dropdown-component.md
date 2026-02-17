@@ -19,6 +19,7 @@ Dropdownはトリガー要素のクリックでメニューを表示し、項目
 **実務での活用場面:** ヘッダーのユーザーメニュー、フィルタ・ソートの選択UI、設定画面のオプション選択、ナビゲーションのサブメニューなど。特にSaaSの管理画面ではテーブルの各行にアクションメニュー（編集・削除・複製等）をDropdownで配置するパターンが定番です。
 
 **よくある誤解:**
+
 - ❌ 「stateだけで開閉管理すればいい」→ 外側クリックで閉じるには`useRef`でDOM参照が必要
 - ❌ 「onBlurで外側クリックを検知できる」→ onBlurはフォーカス管理に依存し、意図しない挙動になりやすい
 - ❌ 「メニューはトグルボタンの直下に置けばいい」→ `position: absolute`で正確に位置を制御する必要がある
@@ -26,6 +27,8 @@ Dropdownはトリガー要素のクリックでメニューを表示し、項目
 ## 💡 コード例
 
 ### 基本: トグルで開閉
+
+まずは最もシンプルな形から始めます。`useState`の真偽値1つだけでメニューの開閉を制御します。このステージの目的は、Dropdownの基本構造（トリガーボタン + メニューリスト）と、条件付きレンダリングによる表示切り替えの仕組みを理解することです。外側クリックやキーボード操作はまだ考えず、「開閉の骨格」に集中します。
 
 ```tsx
 import { useState } from 'react';
@@ -39,17 +42,20 @@ function Dropdown({ label, items }: Props) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
+    // relative を指定することで、子要素の absolute 配置の基準点になる
     <div className="relative inline-block">
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="bg-white border border-gray-300 rounded px-4 py-2 hover:bg-gray-50 flex items-center gap-2"
       >
         {label}
+        {/* isOpen に応じて矢印を回転させ、開閉状態を視覚的にフィードバック */}
         <span className={`transition-transform ${isOpen ? 'rotate-180' : ''}`}>
           ▼
         </span>
       </button>
 
+      {/* 条件付きレンダリング: isOpen が false のときはDOMに存在しない */}
       {isOpen && (
         <ul className="absolute top-full left-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-10">
           {items.map((item) => (
@@ -58,6 +64,7 @@ function Dropdown({ label, items }: Props) {
                 className="w-full text-left px-4 py-2 hover:bg-gray-100 text-gray-700"
                 onClick={() => {
                   alert(item);
+                  // 項目選択後にメニューを閉じる（ユーザーの操作が完了したため）
                   setIsOpen(false);
                 }}
               >
@@ -84,7 +91,11 @@ function App() {
 }
 ```
 
+> **💡 次のステップへ:** この基本形にはユーザビリティ上の大きな問題があります。メニューが開いた状態で「メニューの外側」をクリックしても閉じません。実際のUIではユーザーは「どこか別の場所をクリックすればメニューが閉じる」と期待するため、次のステージで `useRef` を使った外側クリック検知を追加します。
+
 ### 応用: 外側クリックで閉じる（useRef + useEffect）
+
+基本形では `useState` だけで開閉を管理していましたが、「Dropdown領域の外側がクリックされた」ことを検知するには、ReactのState管理だけでは不十分です。なぜなら、外側のクリックはDropdownコンポーネントの外で発生するイベントであり、Reactのイベントハンドラでは捕捉できないからです。ここで `useRef` によるDOM参照と `document` レベルのイベントリスナーを組み合わせるパターンが必要になります。
 
 ```tsx
 import { useState, useRef, useEffect } from 'react';
@@ -96,26 +107,32 @@ type Props = {
 
 function Dropdown({ label, items }: Props) {
   const [isOpen, setIsOpen] = useState(false);
+  // useRef でDropdown全体のDOM要素を参照し、クリック位置の判定に使う
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // 外側クリックで閉じる
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
+      // contains() で「クリックされた要素がDropdown内かどうか」を判定
+      // Dropdown外であれば閉じる
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setIsOpen(false);
       }
     };
 
+    // メニューが開いているときだけリスナーを登録し、不要なイベント処理を避ける
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
+    // クリーンアップ: メニューが閉じたとき、またはアンマウント時にリスナーを解除
+    // これを忘れるとメモリリークや意図しない動作の原因になる
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isOpen]);
 
   return (
+    // ref を最外層の div に付けることで、ボタンもメニューも含めた領域全体を参照できる
     <div className="relative inline-block" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
@@ -164,7 +181,11 @@ function App() {
 }
 ```
 
+> **💡 次のステップへ:** 外側クリックで閉じる機能が加わり、実用的なDropdownになりました。しかし実務ではさらに2つの機能が求められます。(1) 選択した値を親コンポーネントに伝えて状態を管理する機能、(2) キーボードだけで操作できるアクセシビリティ対応です。次のステージではこれらを実装し、プロダクション品質に近づけます。
+
 ### 実践: 選択値の管理 + キーボード操作
+
+実務のDropdownは「何が選択されているか」を親コンポーネントが管理する制御コンポーネントとして設計します。`value` と `onChange` を props で受け取る設計は、React の `<input>` と同じパターンであり、フォームライブラリとの統合やバリデーションの実装が容易になります。さらにキーボードナビゲーションを追加することで、マウスが使えないユーザーやスクリーンリーダー利用者にも操作可能なUIになります。
 
 ```tsx
 import { useState, useRef, useEffect, type KeyboardEvent } from 'react';
@@ -172,16 +193,18 @@ import { useState, useRef, useEffect, type KeyboardEvent } from 'react';
 type Props = {
   label: string;
   items: string[];
+  // value + onChange の組み合わせで「制御コンポーネント」パターンを実現
+  // 親が状態を持ち、子は表示と操作のみを担当する
   value: string;
   onChange: (value: string) => void;
 };
 
 function Dropdown({ label, items, value, onChange }: Props) {
   const [isOpen, setIsOpen] = useState(false);
+  // キーボードで現在どの項目がハイライトされているかを追跡
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // 外側クリックで閉じる
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -198,8 +221,8 @@ function Dropdown({ label, items, value, onChange }: Props) {
     };
   }, [isOpen]);
 
-  // キーボード操作
   const handleKeyDown = (e: KeyboardEvent) => {
+    // メニューが閉じている状態でのキー操作: Enter/Space/ArrowDown でメニューを開く
     if (!isOpen) {
       if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') {
         e.preventDefault();
@@ -212,12 +235,14 @@ function Dropdown({ label, items, value, onChange }: Props) {
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
+        // 末尾に達したら先頭に戻る（循環ナビゲーション）
         setHighlightedIndex((prev) =>
           prev < items.length - 1 ? prev + 1 : 0
         );
         break;
       case 'ArrowUp':
         e.preventDefault();
+        // 先頭に達したら末尾に戻る（循環ナビゲーション）
         setHighlightedIndex((prev) =>
           prev > 0 ? prev - 1 : items.length - 1
         );
@@ -225,16 +250,19 @@ function Dropdown({ label, items, value, onChange }: Props) {
       case 'Enter':
         e.preventDefault();
         if (highlightedIndex >= 0) {
+          // onChange で親に選択値を通知（制御コンポーネントパターン）
           onChange(items[highlightedIndex]);
           setIsOpen(false);
         }
         break;
       case 'Escape':
+        // Escape は「操作のキャンセル」という普遍的なUIの慣習に対応
         setIsOpen(false);
         break;
     }
   };
 
+  // 値が未選択のときは label をプレースホルダーとして表示
   const displayLabel = value || label;
 
   return (
@@ -244,6 +272,7 @@ function Dropdown({ label, items, value, onChange }: Props) {
         onKeyDown={handleKeyDown}
         className="bg-white border border-gray-300 rounded px-4 py-2 hover:bg-gray-50 flex items-center gap-2 min-w-[160px] justify-between"
       >
+        {/* 選択済みかどうかでテキスト色を変え、プレースホルダーと区別する */}
         <span className={value ? 'text-gray-900' : 'text-gray-400'}>
           {displayLabel}
         </span>
@@ -258,6 +287,7 @@ function Dropdown({ label, items, value, onChange }: Props) {
             <li key={item}>
               <button
                 className={`w-full text-left px-4 py-2 text-gray-700 ${
+                  // キーボードハイライトとマウスホバーの視覚フィードバックを分離
                   index === highlightedIndex
                     ? 'bg-blue-50 text-blue-700'
                     : 'hover:bg-gray-100'
@@ -266,6 +296,7 @@ function Dropdown({ label, items, value, onChange }: Props) {
                   onChange(item);
                   setIsOpen(false);
                 }}
+                // マウスホバーでもハイライトを更新し、キーボードとマウスの併用に対応
                 onMouseEnter={() => setHighlightedIndex(index)}
               >
                 {item}
@@ -300,43 +331,10 @@ function App() {
 
 ## 🎯 演習問題
 
-### 基本: 開閉の切り替え
-
-クリックでメニューを開閉するDropdownコンポーネントを作ってください。
-
-```tsx
-import { useState } from 'react';
-
-type Props = {
-  label: string;
-  items: string[];
-};
-
-function Dropdown({ label, items }: Props) {
-  // ここにコードを書く
-  // isOpen state でメニューの表示/非表示を切り替え
-  // items を map でリスト表示
-
-  return (
-    <div>
-      {/* トリガーボタンとメニューリストを配置 */}
-    </div>
-  );
-}
-```
-
-**期待される動作:**
-- ボタンクリックでメニューが開く
-- もう一度クリックで閉じる
-- メニュー項目をクリックするとメニューが閉じる
-
----
-
-### 応用: 外側クリック + 選択値の管理
-
 外側クリックで閉じる機能と、選択した値を表示する機能を追加してください。
 
 **要件:**
+
 1. `useRef`でDropdown全体のDOM参照を取得
 2. `useEffect`で`mousedown`イベントを監視し、外側クリック時に閉じる
 3. イベントリスナーのクリーンアップを忘れない
@@ -344,6 +342,7 @@ function Dropdown({ label, items }: Props) {
 5. `onChange`コールバックで親に選択値を通知
 
 **ヒント:**
+
 ```tsx
 const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -355,30 +354,6 @@ useEffect(() => {
   };
   // mousedown イベントリスナーの登録と解除
 }, [isOpen]);
-```
-
----
-
-### 発展: キーボードナビゲーション
-
-Dropdownにキーボード操作を追加してください。
-
-**要件:**
-1. `ArrowDown` / `ArrowUp`でメニュー項目をハイライト移動
-2. `Enter`でハイライト中の項目を選択
-3. `Escape`でメニューを閉じる
-4. ハイライト中の項目は背景色で強調表示
-5. リストの端に達したら反対側にループする（最後→最初、最初→最後）
-
-**完成イメージ:**
-```
-[フルーツを選択 ▼]
-┌──────────┐
-│ りんご     │  ← ↑↓で移動
-│ バナナ  ◀─│  ← ハイライト表示
-│ オレンジ   │
-│ ぶどう     │
-└──────────┘
 ```
 
 ## ✅ 重要ポイント
