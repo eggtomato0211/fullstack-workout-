@@ -5,27 +5,34 @@
 - `fmt.Errorf`の`%w`動詞によるエラーラッピング
 - `errors.Is`でエラーチェーンをたどって一致を判定
 - `errors.As`でエラーチェーンからカスタムエラーを取得
-- エラーに文脈を追加しながら伝搬させるパターン
 
-**なぜ重要か:** 実務では、エラーは複数の層を通過して伝搬します（DB層→リポジトリ層→サービス層→ハンドラー層）。各層でエラーに文脈を追加しつつ、元のエラーの種類を判別できるようにする必要があります。`errors.Is`/`errors.As`はこのための標準的な仕組みです。
+## 📖 なぜerrors.Is/Asを理解する必要があるのか
 
-## 📖 概念
+実務のアプリケーションでは、エラーは複数の層を通過して伝搬します（DB層→リポジトリ層→サービス層→ハンドラー層）。各層でエラーに文脈を追加しつつ、元のエラーの種類も判別したい。`errors.Is`/`errors.As`はこの「ラップされたエラーの中身を調べる」仕組みです。
 
-`fmt.Errorf("...: %w", err)`でエラーをラップすると、元のエラーを内包した新しいエラーが作られます。`errors.Is`はエラーチェーンをたどって指定のエラーと一致するか判定し、`errors.As`はエラーチェーンから特定の型のエラーを取り出します。
+### こう書かないとどうなるか
 
-**背景と設計意図:** Go 1.13で導入されたエラーラッピングは、「エラーに文脈を追加しつつ、元のエラー情報を保持する」という実務ニーズに応えるものです。`%w`でラップし、`errors.Is`/`errors.As`でアンラップするのが標準パターンです。
+```go
+// %v でフォーマット → 元のエラー情報が失われる
+return fmt.Errorf("user service: %v", err)
+// ↓ この後 errors.Is(err, ErrNotFound) が false になる！
 
-**よくある誤解:**
+// %w でラップ → 元のエラーを保持したまま文脈を追加
+return fmt.Errorf("user service: %w", err)
+// ↓ errors.Is(err, ErrNotFound) が true になる
 
-- ❌ 「`%v`と`%w`は同じ」→ `%v`はラップしない（元のエラーを失う）、`%w`はラップする
-- ❌ 「`==`でエラーを比較すればいい」→ ラップされたエラーは`==`で一致しない。`errors.Is`を使う
-- ❌ 「全てのエラーをラップすべき」→ 文脈が追加されない場合はラップ不要
+// == で比較 → ラップされたエラーは一致しない
+if err == ErrNotFound { ... } // ラップされていると false
+
+// errors.Is → チェーンをたどって一致を判定
+if errors.Is(err, ErrNotFound) { ... } // ラップされていても true
+```
+
+`%v`と`%w`の1文字の違いが、エラーの追跡可能性を決定します。
 
 ## 💡 コード例
 
-### 基本: エラーラッピングとerrors.Is
-
-`%w`でエラーをラップし、`errors.Is`でチェーンをたどる基本パターンを学びます。
+### 基本: エラーラッピングとerrors.Is/As
 
 ```go
 package main
@@ -35,9 +42,20 @@ import (
 	"fmt"
 )
 
-// センチネルエラー
 var ErrNotFound = errors.New("not found")
 var ErrPermissionDenied = errors.New("permission denied")
+
+// ValidationError はカスタムエラー型
+type ValidationError struct {
+	Field   string
+	Message string
+}
+
+func (e *ValidationError) Error() string {
+	return fmt.Sprintf("validation: %s - %s", e.Field, e.Message)
+}
+
+// --- 各層でエラーに文脈を追加しながら伝搬 ---
 
 // DB層: 元のエラーを返す
 func findUserInDB(id int) (string, error) {
@@ -47,11 +65,10 @@ func findUserInDB(id int) (string, error) {
 	return "田中太郎", nil
 }
 
-// リポジトリ層: エラーに文脈を追加してラップ
+// リポジトリ層: %w で文脈を追加してラップ
 func getUserFromRepo(id int) (string, error) {
 	name, err := findUserInDB(id)
 	if err != nil {
-		// %w でラップ: 元のエラー(ErrNotFound)を内包しつつ文脈を追加
 		return "", fmt.Errorf("getUserFromRepo(id=%d): %w", id, err)
 	}
 	return name, nil
@@ -66,62 +83,6 @@ func getUserService(id int) (string, error) {
 	return name, nil
 }
 
-func main() {
-	_, err := getUserService(99)
-	if err != nil {
-		// エラーメッセージ全体を表示（各層の文脈が含まれる）
-		fmt.Println("エラー:", err)
-		// → user service: getUserFromRepo(id=99): not found
-
-		// errors.Is: エラーチェーンをたどって ErrNotFound と一致するか判定
-		if errors.Is(err, ErrNotFound) {
-			fmt.Println("→ ユーザーが見つかりません（404を返す）")
-		}
-
-		// ラップされていても元のエラーを検出できる
-		if errors.Is(err, ErrPermissionDenied) {
-			fmt.Println("→ 権限がありません（403を返す）")
-		} else {
-			fmt.Println("→ 権限エラーではない")
-		}
-	}
-}
-```
-
-> **💡 次のステップへ:** `errors.Is`でセンチネルエラーを判定する方法を学びました。次は`errors.As`でカスタムエラー型を取り出す方法を学びます。
-
-### 応用: errors.Asでカスタムエラーを取り出す
-
-ラップされたエラーチェーンから、特定の型のカスタムエラーを取り出して詳細情報にアクセスします。
-
-```go
-package main
-
-import (
-	"errors"
-	"fmt"
-)
-
-// ValidationError はフィールドのバリデーションエラー
-type ValidationError struct {
-	Field   string
-	Message string
-}
-
-func (e *ValidationError) Error() string {
-	return fmt.Sprintf("validation: %s - %s", e.Field, e.Message)
-}
-
-// DBError はデータベース操作のエラー
-type DBError struct {
-	Query   string
-	Message string
-}
-
-func (e *DBError) Error() string {
-	return fmt.Sprintf("db error: %s (%s)", e.Message, e.Query)
-}
-
 func validateEmail(email string) error {
 	if email == "" {
 		return &ValidationError{Field: "email", Message: "is required"}
@@ -129,51 +90,49 @@ func validateEmail(email string) error {
 	return nil
 }
 
-func saveUser(email string) error {
+func createUser(email string) error {
 	if err := validateEmail(email); err != nil {
-		// バリデーションエラーをラップ
-		return fmt.Errorf("saveUser: %w", err)
+		return fmt.Errorf("createUser: %w", err) // カスタムエラーもラップ可能
 	}
-	// DB操作のシミュレーション
-	return fmt.Errorf("saveUser: %w", &DBError{
-		Query:   "INSERT INTO users",
-		Message: "duplicate key",
-	})
+	return nil
 }
 
 func main() {
-	// ケース1: バリデーションエラー
-	err := saveUser("")
+	// --- errors.Is: センチネルエラーの判定 ---
+	_, err := getUserService(99)
 	if err != nil {
 		fmt.Println("エラー:", err)
+		// → user service: getUserFromRepo(id=99): not found
 
-		// errors.As: エラーチェーンから ValidationError を取り出す
+		// errors.Is: ラップされていても元のErrNotFoundを検出できる
+		if errors.Is(err, ErrNotFound) {
+			fmt.Println("→ 404を返す")
+		}
+		if errors.Is(err, ErrPermissionDenied) {
+			fmt.Println("→ 403を返す")
+		} else {
+			fmt.Println("→ 権限エラーではない")
+		}
+	}
+
+	// --- errors.As: カスタムエラー型の取り出し ---
+	err = createUser("")
+	if err != nil {
+		fmt.Println("\nエラー:", err)
+
+		// errors.As: ラップされたValidationErrorを取り出す
 		var ve *ValidationError
 		if errors.As(err, &ve) {
 			fmt.Printf("→ バリデーションエラー: フィールド=%s, メッセージ=%s\n",
 				ve.Field, ve.Message)
 		}
 	}
-
-	// ケース2: DBエラー
-	err = saveUser("test@example.com")
-	if err != nil {
-		fmt.Println("\nエラー:", err)
-
-		var de *DBError
-		if errors.As(err, &de) {
-			fmt.Printf("→ DBエラー: クエリ=%s, メッセージ=%s\n",
-				de.Query, de.Message)
-		}
-	}
 }
 ```
 
-> **💡 次のステップへ:** `errors.As`でカスタムエラーの詳細を取得する方法を学びました。次は実務でのエラー伝搬パターンを学びます。
+### 実践: Unwrapとレイヤー構造でのエラー伝搬
 
-### 実践: レイヤー構造でのエラー伝搬
-
-実務のアプリケーションで、各層でエラーに文脈を追加しながら伝搬させるパターンを学びます。
+カスタムエラー型に`Unwrap()`メソッドを実装すると、`errors.Is`/`errors.As`がチェーンをたどれるようになります。
 
 ```go
 package main
@@ -183,11 +142,10 @@ import (
 	"fmt"
 )
 
-// ---- エラー定義 ----
-
 var ErrNotFound = errors.New("not found")
-var ErrConflict = errors.New("conflict")
 
+// AppError はアプリケーション共通のエラー型
+// Unwrap()を実装して、errors.Is/Asがチェーンをたどれるようにする
 type AppError struct {
 	StatusCode int
 	Message    string
@@ -201,12 +159,13 @@ func (e *AppError) Error() string {
 	return fmt.Sprintf("[%d] %s", e.StatusCode, e.Message)
 }
 
-// Unwrap で元のエラーを返す → errors.Is/As がチェーンをたどれる
+// Unwrap で元のエラーを返す
+// → errors.Is(appErr, ErrNotFound) が機能するようになる
 func (e *AppError) Unwrap() error {
 	return e.Err
 }
 
-// ---- DB層 ----
+// --- DB層 → リポジトリ層 → サービス層 → ハンドラー層 ---
 
 func findOrderInDB(id int) (string, error) {
 	if id == 0 {
@@ -214,8 +173,6 @@ func findOrderInDB(id int) (string, error) {
 	}
 	return "注文#" + fmt.Sprint(id), nil
 }
-
-// ---- リポジトリ層 ----
 
 func getOrder(id int) (string, error) {
 	order, err := findOrderInDB(id)
@@ -225,45 +182,30 @@ func getOrder(id int) (string, error) {
 	return order, nil
 }
 
-// ---- サービス層 ----
-
 func processOrder(id int) error {
 	order, err := getOrder(id)
 	if err != nil {
-		// errors.Is で元のエラーを判定し、適切な AppError に変換
 		if errors.Is(err, ErrNotFound) {
-			return &AppError{
-				StatusCode: 404,
-				Message:    "order not found",
-				Err:        err,
-			}
+			return &AppError{StatusCode: 404, Message: "order not found", Err: err}
 		}
-		return &AppError{
-			StatusCode: 500,
-			Message:    "internal error",
-			Err:        err,
-		}
+		return &AppError{StatusCode: 500, Message: "internal error", Err: err}
 	}
 	fmt.Println("処理完了:", order)
 	return nil
 }
 
-// ---- ハンドラー層 ----
-
 func handleOrderRequest(id int) {
 	err := processOrder(id)
 	if err != nil {
-		// AppError として取り出してステータスコードを使う
+		// errors.As でAppErrorを取り出してステータスコードを使う
 		var appErr *AppError
 		if errors.As(err, &appErr) {
 			fmt.Printf("HTTP %d: %s\n", appErr.StatusCode, appErr.Message)
+		}
 
-			// さらに元のエラーもチェック可能（Unwrapチェーン）
-			if errors.Is(err, ErrNotFound) {
-				fmt.Println("→ リソースが見つかりません")
-			}
-		} else {
-			fmt.Println("HTTP 500: unexpected error")
+		// Unwrapのおかげで、AppErrorの中のErrNotFoundも検出できる
+		if errors.Is(err, ErrNotFound) {
+			fmt.Println("→ リソースが見つかりません")
 		}
 		return
 	}
@@ -291,7 +233,6 @@ func main() {
 
 - `handleRequest("")` → "400 Bad Request"と表示
 - `handleRequest("https://slow.example.com")` → "504 Gateway Timeout"と表示
-- エラーメッセージに各層の文脈が含まれている
 
 ## ✅ 重要ポイント
 

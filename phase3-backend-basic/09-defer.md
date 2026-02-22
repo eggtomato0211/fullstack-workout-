@@ -4,80 +4,57 @@
 
 - defer文の基本的な動作と実行順序（LIFO）
 - リソース解放パターン（ファイル、DB接続など）
-- deferとエラーハンドリングの組み合わせ
 - deferの注意点（ループ内でのdefer、引数の評価タイミング）
 
-**なぜ重要か:** ファイルのクローズ、DB接続の解放、ロックの解除など、「関数が終わったら必ず実行したい処理」はdeferで確実に行います。deferがないと、エラーリターンのたびに手動でクリーンアップコードを書く必要があり、リソースリークの原因になります。
+## 📖 なぜdeferを理解する必要があるのか
 
-## 📖 概念
+ファイルのクローズ、DB接続の解放、ロックの解除など、「関数が終わったら必ず実行したい処理」はdeferで書きます。JavaやPythonの`try/finally`に相当しますが、Goのdeferは**リソース取得の直後に書ける**ため、取得と解放がセットで見えます。
 
-`defer`は関数の終了時に実行される処理を予約する構文です。複数のdeferはLIFO（後入れ先出し）の順序で実行されます。deferはpanicが発生しても実行されるため、リソースのクリーンアップに最適です。
+### こう書かないとどうなるか
 
-**背景と設計意図:** JavaやPythonでは`try/finally`でリソース解放を保証しますが、Goはdeferでよりシンプルに表現します。リソースの取得と解放を近い位置に書けるため、可読性も高くなります。
+```go
+// deferを使わない場合 → エラーリターンのたびにCloseが必要
+func readFile(name string) (string, error) {
+    f, err := os.Open(name)
+    if err != nil {
+        return "", err
+    }
 
-**よくある誤解:**
+    data, err := io.ReadAll(f)
+    if err != nil {
+        f.Close() // ← ここでも閉じる必要がある
+        return "", err
+    }
 
-- ❌ 「deferは即座に実行される」→ 関数の終了時に実行される
-- ❌ 「deferの引数は遅延評価される」→ 引数はdefer文の時点で評価される
-- ❌ 「ループ内でdeferしてよい」→ ループ内のdeferはループ終了ではなく関数終了時に実行される
+    f.Close() // ← ここでも閉じる必要がある
+    return string(data), nil
+}
+
+// deferを使う場合 → 1箇所書くだけで確実に実行される
+func readFile(name string) (string, error) {
+    f, err := os.Open(name)
+    if err != nil {
+        return "", err
+    }
+    defer f.Close() // ← どのリターンパスでも確実に実行される
+
+    data, err := io.ReadAll(f)
+    if err != nil {
+        return "", err // f.Close()はdeferが呼ぶ
+    }
+    return string(data), nil
+}
+```
+
+### deferの3つのルール
+
+1. **関数の終了時に実行**される（即座ではない）
+2. **LIFO順**で実行される（最後にdeferしたものが最初に実行）
+3. **引数はdefer文の時点で評価**される（遅延評価ではない）
 
 ## 💡 コード例
 
-### 基本: deferの動作と実行順序
-
-deferの基本的な動作と、LIFO（後入れ先出し）の実行順序を学びます。
-
-```go
-package main
-
-import "fmt"
-
-func main() {
-	fmt.Println("開始")
-
-	// defer は関数の終了時に実行される
-	defer fmt.Println("defer 1")
-	defer fmt.Println("defer 2")
-	defer fmt.Println("defer 3")
-
-	fmt.Println("処理中...")
-	fmt.Println("終了")
-
-	// 出力順序:
-	// 開始
-	// 処理中...
-	// 終了
-	// defer 3  ← LIFO: 最後にdeferしたものが最初に実行
-	// defer 2
-	// defer 1
-}
-```
-
-```go
-package main
-
-import "fmt"
-
-// deferの引数は「defer文を実行した時点で」評価される
-func deferArgEvaluation() {
-	x := 10
-	defer fmt.Println("deferされた x:", x) // この時点で x=10 が確定
-
-	x = 20
-	fmt.Println("現在の x:", x) // 20
-	// 出力: 現在の x: 20 → deferされた x: 10
-}
-
-func main() {
-	deferArgEvaluation()
-}
-```
-
-> **💡 次のステップへ:** deferの基本動作を学びました。次はリソース管理での実用的な使い方を学びます。
-
-### 応用: リソース管理パターン
-
-ファイル操作やDBコネクションなど、リソースの取得直後にdeferでクリーンアップを予約するパターンです。
+### 基本: deferの動作とリソース管理
 
 ```go
 package main
@@ -87,7 +64,31 @@ import (
 	"strings"
 )
 
-// ---- リソース管理のシミュレーション ----
+// --- deferの基本動作 ---
+
+func deferBasics() {
+	fmt.Println("開始")
+
+	defer fmt.Println("defer 1")
+	defer fmt.Println("defer 2")
+	defer fmt.Println("defer 3")
+
+	fmt.Println("終了")
+	// 出力: 開始 → 終了 → defer 3 → defer 2 → defer 1（LIFO）
+}
+
+// --- 引数はdefer文の時点で評価される ---
+
+func deferArgEvaluation() {
+	x := 10
+	defer fmt.Println("deferされた x:", x) // この時点で x=10 が確定
+
+	x = 20
+	fmt.Println("現在の x:", x) // 20
+	// 出力: 現在の x: 20 → deferされた x: 10
+}
+
+// --- リソース管理: 取得直後にdeferで解放を予約 ---
 
 type FileHandle struct {
 	name   string
@@ -112,8 +113,6 @@ func (f *FileHandle) Close() error {
 	return nil
 }
 
-// ---- 良いパターン: 取得直後にdefer ----
-
 func readFile(name string) (string, error) {
 	f, err := OpenFile(name)
 	if err != nil {
@@ -123,64 +122,36 @@ func readFile(name string) (string, error) {
 
 	// ここでエラーが起きても f.Close() は確実に実行される
 	content := f.Read()
-	if content == "" {
-		return "", fmt.Errorf("empty file: %s", name)
-	}
-
 	return strings.ToUpper(content), nil
 }
 
-// ---- 複数リソースのクリーンアップ ----
-
-func copyFile(src, dst string) error {
-	srcFile, err := OpenFile(src)
-	if err != nil {
-		return err
-	}
-	defer srcFile.Close() // 1番目に予約
-
-	dstFile, err := OpenFile(dst)
-	if err != nil {
-		return err // srcFile.Close() は実行される
-	}
-	defer dstFile.Close() // 2番目に予約
-
-	content := srcFile.Read()
-	fmt.Printf("コピー: %s → %s (%s)\n", src, dst, content)
-	return nil
-
-	// 関数終了時: dstFile.Close() → srcFile.Close() の順で実行
-}
-
 func main() {
+	deferBasics()
+	fmt.Println("---")
+	deferArgEvaluation()
+	fmt.Println("---")
+
 	content, err := readFile("test.txt")
 	if err != nil {
 		fmt.Println("Error:", err)
 	} else {
 		fmt.Println("内容:", content)
 	}
-
-	fmt.Println("---")
-	copyFile("source.txt", "dest.txt")
 }
 ```
 
-> **💡 次のステップへ:** リソース管理パターンを学びました。次はdeferの注意点と実務的なパターンを学びます。
+### 実践: deferの落とし穴と実務パターン
 
-### 実践: deferの注意点と実務パターン
-
-deferの落とし穴と、エラーハンドリングと組み合わせた実務パターンを学びます。
+ループ内のdeferや、deferでエラーを返すパターンなど、実務で遭遇する注意点を学びます。
 
 ```go
 package main
 
 import "fmt"
 
-// ---- 注意点1: ループ内のdefer ----
+// --- 落とし穴: ループ内のdefer ---
 
-type Resource struct {
-	id int
-}
+type Resource struct{ id int }
 
 func (r *Resource) Close() {
 	fmt.Printf("Resource %d closed\n", r.id)
@@ -188,19 +159,18 @@ func (r *Resource) Close() {
 
 // 悪い例: ループ内のdeferは関数終了まで実行されない
 func badLoopDefer() {
-	fmt.Println("=== 悪い例: ループ内のdefer ===")
+	fmt.Println("=== 悪い例 ===")
 	for i := 0; i < 3; i++ {
 		r := &Resource{id: i}
-		defer r.Close() // 関数終了まで閉じられない！
+		defer r.Close() // 関数終了まで閉じられない → リソースが溜まる！
 		fmt.Printf("Resource %d を使用中\n", r.id)
 	}
 	fmt.Println("関数終了")
-	// ここで全てのClose()が実行される（リソースが溜まる）
 }
 
 // 良い例: 無名関数でスコープを作る
 func goodLoopDefer() {
-	fmt.Println("\n=== 良い例: 無名関数でスコープを作る ===")
+	fmt.Println("\n=== 良い例 ===")
 	for i := 0; i < 3; i++ {
 		func() {
 			r := &Resource{id: i}
@@ -211,11 +181,9 @@ func goodLoopDefer() {
 	fmt.Println("関数終了")
 }
 
-// ---- 注意点2: deferでエラーを扱う ----
+// --- 実務パターン: deferでCloseのエラーを処理 ---
 
-type DBConn struct {
-	name string
-}
+type DBConn struct{ name string }
 
 func (c *DBConn) Close() error {
 	fmt.Printf("DB接続 %s を閉じる\n", c.name)
@@ -226,11 +194,10 @@ func (c *DBConn) Query(sql string) (string, error) {
 	return "結果データ", nil
 }
 
-// deferでCloseのエラーを処理するパターン
+// 名前付き戻り値を使って、deferからエラーを返す
 func queryWithCleanup(connName, sql string) (result string, err error) {
 	conn := &DBConn{name: connName}
 
-	// 名前付き戻り値(err)を使って、deferでCloseのエラーを返す
 	defer func() {
 		closeErr := conn.Close()
 		if err == nil {
@@ -271,20 +238,6 @@ func main() {
 3. `Commit() error`: コミットする（2回目以降はエラー）
 4. `Rollback() error`: ロールバックする（コミット済みならスキップ）
 5. `ExecuteInTx(fn func(tx *Transaction) error) error`: トランザクション内で処理を実行し、エラー時はRollback、成功時はCommitをdeferで行う
-
-**ヒント:**
-
-```go
-func ExecuteInTx(fn func(tx *Transaction) error) error {
-	tx := BeginTx()
-	defer func() {
-		if /* エラーがあったら */ {
-			tx.Rollback()
-		}
-	}()
-	// fn を実行して、成功したら Commit
-}
-```
 
 **期待される動作:**
 

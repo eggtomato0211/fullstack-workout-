@@ -4,28 +4,37 @@
 
 - `json.Marshal`/`json.Unmarshal`の基本
 - 構造体タグによるフィールド名のカスタマイズ
-- `omitempty`オプションの活用
-- ネストした構造体やスライスのJSON変換
+- `omitempty`、`json:"-"`オプションの活用
 
-**なぜ重要か:** Web APIでは、リクエストの受信（JSON→構造体）とレスポンスの送信（構造体→JSON）が基本です。構造体タグでJSONのフィールド名をコントロールする方法は、Go WebAPI開発の最も基礎的なスキルです。
+## 📖 なぜencoding/jsonを理解する必要があるのか
 
-## 📖 概念
+Web APIでは、リクエストの受信（JSON→構造体）とレスポンスの送信（構造体→JSON）が全ての基本です。GoのフィールドはPascalCase（`UserName`）ですが、JSONは通常snake_case（`user_name`）やcamelCase（`userName`）を使います。構造体タグがこのギャップを埋めます。
 
-`encoding/json`パッケージはGoの構造体とJSONの相互変換を行います。構造体タグ（`` `json:"..."` ``）でフィールド名の変換ルールを指定します。GoはcamelCase、JSONはsnake_caseが多いため、タグで変換を制御します。
+### こう書かないとどうなるか
 
-**背景と設計意図:** Goの構造体フィールドはPascalCase（大文字始まり）で書きますが、JSONのキーはsnake_caseやcamelCaseが一般的です。構造体タグはこのギャップを埋めるための仕組みです。
+```go
+// タグなしの構造体
+type User struct {
+    UserName string
+    Email    string
+}
 
-**よくある誤解:**
+// JSON出力: {"UserName":"田中","Email":"..."} ← PascalCaseのまま
+// フロントエンドは通常 user_name や userName を期待する → 不一致
 
-- ❌ 「小文字のフィールドもJSON変換される」→ unexported（小文字始まり）フィールドはJSON変換されない
-- ❌ 「`omitempty`はゼロ値を省略する」→ 正確にはゼロ値のフィールドをJSON出力から省略する
-- ❌ 「構造体タグなしでもOK」→ フィールド名がそのままJSONキーになる（PascalCase）
+// タグありの構造体
+type User struct {
+    UserName string `json:"user_name"`
+    Email    string `json:"email"`
+}
+// JSON出力: {"user_name":"田中","email":"..."} ← 期待通り
+```
+
+また、小文字で始まるフィールド（unexported）はJSON変換されません。これはGoの可視性ルールに従っています。
 
 ## 💡 コード例
 
-### 基本: Marshal/Unmarshalの基礎
-
-構造体とJSONの相互変換の基本を学びます。
+### 基本: Marshal/Unmarshalと構造体タグ
 
 ```go
 package main
@@ -36,24 +45,32 @@ import (
 )
 
 type User struct {
-	ID    int    `json:"id"`          // JSON: "id"
-	Name  string `json:"name"`        // JSON: "name"
-	Email string `json:"email"`       // JSON: "email"
-	Age   int    `json:"age"`         // JSON: "age"
-	role  string // 小文字フィールド → JSON変換されない（unexported）
+	ID    int    `json:"id"`
+	Name  string `json:"name"`
+	Email string `json:"email"`
+	Age   int    `json:"age"`
+	role  string // 小文字 → JSON変換されない（unexported）
 }
 
+type Product struct {
+	ID          int    `json:"id"`
+	Name        string `json:"name"`
+	Price       int    `json:"price"`
+	Description string `json:"description,omitempty"` // 空文字→省略
+	Discount    int    `json:"discount,omitempty"`    // 0→省略
+	InternalKey string `json:"-"`                     // JSONに一切含めない
+	Stock       *int   `json:"stock,omitempty"`       // nil→省略
+}
+
+func intPtr(i int) *int { return &i }
+
 func main() {
-	// ---- Marshal: 構造体 → JSON ----
+	// --- Marshal: 構造体 → JSON ---
 	user := User{
-		ID:    1,
-		Name:  "田中太郎",
-		Email: "tanaka@example.com",
-		Age:   30,
-		role:  "admin", // unexported → JSONに含まれない
+		ID: 1, Name: "田中太郎", Email: "tanaka@example.com",
+		Age: 30, role: "admin", // roleはJSONに含まれない
 	}
 
-	// json.Marshal → []byte を返す
 	jsonBytes, err := json.Marshal(user)
 	if err != nil {
 		fmt.Println("Marshal error:", err)
@@ -62,12 +79,12 @@ func main() {
 	fmt.Println("JSON:", string(jsonBytes))
 	// → {"id":1,"name":"田中太郎","email":"tanaka@example.com","age":30}
 
-	// json.MarshalIndent → 整形されたJSON
+	// MarshalIndent → 整形されたJSON（デバッグ用）
 	prettyJSON, _ := json.MarshalIndent(user, "", "  ")
 	fmt.Println("Pretty JSON:")
 	fmt.Println(string(prettyJSON))
 
-	// ---- Unmarshal: JSON → 構造体 ----
+	// --- Unmarshal: JSON → 構造体 ---
 	jsonStr := `{"id":2,"name":"鈴木花子","email":"suzuki@example.com","age":25}`
 
 	var decoded User
@@ -76,83 +93,33 @@ func main() {
 		return
 	}
 	fmt.Printf("Decoded: %+v\n", decoded)
-	// → {ID:2 Name:鈴木花子 Email:suzuki@example.com Age:25 role:}
-}
-```
 
-> **💡 次のステップへ:** 基本的なMarshal/Unmarshalを学びました。次は構造体タグのオプション（`omitempty`など）を学びます。
-
-### 応用: 構造体タグのオプション
-
-`omitempty`や`-`オプションを使って、JSONの出力を制御する方法を学びます。
-
-```go
-package main
-
-import (
-	"encoding/json"
-	"fmt"
-)
-
-type Product struct {
-	ID          int     `json:"id"`
-	Name        string  `json:"name"`
-	Price       int     `json:"price"`
-	Description string  `json:"description,omitempty"` // 空文字列の場合はJSONから省略
-	Discount    int     `json:"discount,omitempty"`    // 0の場合はJSONから省略
-	InternalKey string  `json:"-"`                     // JSONに含めない
-	Stock       *int    `json:"stock,omitempty"`       // nilの場合はJSONから省略
-}
-
-func intPtr(i int) *int { return &i }
-
-func main() {
-	// omitempty の動作確認
+	// --- omitempty の動作 ---
+	fmt.Println("\n--- omitempty ---")
 	products := []Product{
 		{
-			ID:          1,
-			Name:        "Go入門書",
-			Price:       3000,
-			Description: "Goの基礎を学ぶ本",
-			Discount:    500,
-			InternalKey: "INTERNAL_001",
-			Stock:       intPtr(10),
+			ID: 1, Name: "Go入門書", Price: 3000,
+			Description: "Goの基礎を学ぶ本", Discount: 500,
+			InternalKey: "INTERNAL_001", Stock: intPtr(10),
 		},
 		{
-			ID:          2,
-			Name:        "キーボード",
-			Price:       15000,
-			Description: "", // omitempty → JSONから省略される
-			Discount:    0,  // omitempty → JSONから省略される
-			InternalKey: "INTERNAL_002",
-			Stock:       nil, // omitempty → JSONから省略される
+			ID: 2, Name: "キーボード", Price: 15000,
+			Description: "", Discount: 0,   // omitempty → 省略される
+			InternalKey: "INTERNAL_002", Stock: nil, // omitempty → 省略される
 		},
 	}
 
 	for _, p := range products {
-		jsonBytes, _ := json.MarshalIndent(p, "", "  ")
-		fmt.Println(string(jsonBytes))
+		j, _ := json.MarshalIndent(p, "", "  ")
+		fmt.Println(string(j))
 		fmt.Println("---")
 	}
-
-	// ---- JSONに未知のフィールドがある場合 ----
-	// 構造体に定義されていないフィールドは無視される
-	jsonStr := `{"id":3,"name":"マウス","price":5000,"color":"black","weight":100}`
-
-	var product Product
-	if err := json.Unmarshal([]byte(jsonStr), &product); err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
-	fmt.Printf("Decoded (未知フィールドは無視): %+v\n", product)
 }
 ```
 
-> **💡 次のステップへ:** 構造体タグのオプションを学びました。次はネストした構造体やAPIレスポンスの実務パターンを学びます。
-
 ### 実践: APIレスポンスの設計パターン
 
-実務でのAPIレスポンス構造体の設計パターンを学びます。
+実務でのAPIレスポンス構造体の設計パターンです。ネストした構造体やスライスのJSON変換を学びます。
 
 ```go
 package main
@@ -163,8 +130,8 @@ import (
 	"time"
 )
 
-// ---- APIレスポンスの共通構造 ----
-
+// --- APIレスポンスの共通構造 ---
+// 成功時はDataにデータ、失敗時はErrorにエラー情報を入れる
 type APIResponse struct {
 	Success bool        `json:"success"`
 	Data    interface{} `json:"data,omitempty"`
@@ -176,8 +143,7 @@ type ErrorInfo struct {
 	Message string `json:"message"`
 }
 
-// ---- ドメインモデル ----
-
+// --- ドメインモデル ---
 type Author struct {
 	ID   int    `json:"id"`
 	Name string `json:"name"`
@@ -187,62 +153,38 @@ type Article struct {
 	ID        int       `json:"id"`
 	Title     string    `json:"title"`
 	Body      string    `json:"body"`
-	Author    Author    `json:"author"`              // ネストした構造体
-	Tags      []string  `json:"tags,omitempty"`       // スライス
+	Author    Author    `json:"author"`         // ネストした構造体
+	Tags      []string  `json:"tags,omitempty"`  // スライス
 	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
-// ---- ページネーション ----
-
-type PaginatedResponse struct {
-	Items      []Article `json:"items"`
-	TotalCount int       `json:"total_count"`
-	Page       int       `json:"page"`
-	PerPage    int       `json:"per_page"`
-	HasMore    bool      `json:"has_more"`
 }
 
 func main() {
 	now := time.Date(2025, 1, 15, 10, 0, 0, 0, time.UTC)
 
-	// ---- 成功レスポンス ----
+	// --- 成功レスポンス ---
 	article := Article{
-		ID:    1,
-		Title: "Go入門",
-		Body:  "Goの基礎を学びましょう",
-		Author: Author{
-			ID:   1,
-			Name: "田中太郎",
-		},
+		ID: 1, Title: "Go入門", Body: "Goの基礎を学びましょう",
+		Author:    Author{ID: 1, Name: "田中太郎"},
 		Tags:      []string{"Go", "プログラミング", "入門"},
 		CreatedAt: now,
-		UpdatedAt: now,
 	}
-
-	successResp := APIResponse{
-		Success: true,
-		Data:    article,
-	}
+	successResp := APIResponse{Success: true, Data: article}
 
 	jsonBytes, _ := json.MarshalIndent(successResp, "", "  ")
 	fmt.Println("=== 成功レスポンス ===")
 	fmt.Println(string(jsonBytes))
 
-	// ---- エラーレスポンス ----
+	// --- エラーレスポンス ---
 	errorResp := APIResponse{
 		Success: false,
-		Error: &ErrorInfo{
-			Code:    "NOT_FOUND",
-			Message: "article not found",
-		},
+		Error:   &ErrorInfo{Code: "NOT_FOUND", Message: "article not found"},
 	}
 
 	jsonBytes, _ = json.MarshalIndent(errorResp, "", "  ")
 	fmt.Println("\n=== エラーレスポンス ===")
 	fmt.Println(string(jsonBytes))
 
-	// ---- JSONリクエストのパース ----
+	// --- JSONリクエストのパース ---
 	requestJSON := `{
 		"title": "新しい記事",
 		"body": "記事の本文です",

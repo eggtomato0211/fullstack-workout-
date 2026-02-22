@@ -1,31 +1,42 @@
-# 12. io.Reader/io.Writerの理解 - Goのインターフェースパターンの代表例、ストリーム処理
+# 12. io.Reader/io.Writerの理解 - Goのインターフェースパターンの代表例
 
 ## 🎯 このテーマで学ぶこと
 
 - `io.Reader`と`io.Writer`インターフェースの仕組み
-- 標準ライブラリでの`io.Reader`/`io.Writer`の活用
 - `io.Copy`、`io.ReadAll`などのユーティリティ関数
 - 自作のReader/Writerの実装
 
-**なぜ重要か:** `io.Reader`と`io.Writer`はGoで最も重要なインターフェースです。ファイル操作、HTTP通信、暗号化、圧縮など、あらゆるI/O操作がこの2つのインターフェースで統一されています。このパターンを理解することで、Goの標準ライブラリを効果的に活用できるようになります。
+## 📖 なぜio.Reader/io.Writerを理解する必要があるのか
 
-## 📖 概念
+`io.Reader`と`io.Writer`はGoで**最も重要なインターフェース**です。ファイル操作、HTTP通信、暗号化、圧縮など、あらゆるI/O操作がこの2つに統一されています。UNIXの「全てはファイル」という哲学を、Goはインターフェースで実現しました。
 
-`io.Reader`は`Read(p []byte) (n int, err error)`、`io.Writer`は`Write(p []byte) (n int, err error)`というたった1つのメソッドを持つインターフェースです。この小さなインターフェースにより、ファイル、ネットワーク、メモリバッファなど、異なるデータソースを同一の方法で扱えます。
+### こう書かないとどうなるか
 
-**背景と設計意図:** UNIXの「全てはファイル」という哲学をGoはインターフェースで実現しました。`io.Reader`を満たすものは全て同じ方法で読み取れるため、データソースの差し替えが容易です。
+```go
+// io.Readerを使わない場合 → データソースごとに別の関数が必要
+func processFromFile(path string) { ... }
+func processFromNetwork(url string) { ... }
+func processFromString(s string) { ... }
 
-**よくある誤解:**
+// io.Readerを使う場合 → 1つの関数で全てに対応
+func process(r io.Reader) {
+    data, _ := io.ReadAll(r)
+    // ファイルでもネットワークでも文字列でも同じ処理
+}
 
-- ❌ 「io.Readerは1回のReadで全データが読める」→ バッファサイズ分ずつ読み取る。`io.ReadAll`で一括読み取り
-- ❌ 「io.EOF はエラー」→ データの終端を示す正常なシグナル
-- ❌ 「strings.NewReader は不要」→ 文字列をio.Readerとして扱いたい場面で必須
+process(file)                          // *os.File は io.Reader
+process(resp.Body)                     // http.Response.Body は io.Reader
+process(strings.NewReader("hello"))    // strings.Reader は io.Reader
+```
+
+### よくある誤解
+
+- `io.EOF`はエラーではなく、データの終端を示す**正常なシグナル**
+- `Read`は1回で全データを読めるとは限らない。`io.ReadAll`で一括読み取りが安全
 
 ## 💡 コード例
 
 ### 基本: io.Reader/io.Writerの基礎
-
-`io.Reader`と`io.Writer`の基本的な使い方を学びます。
 
 ```go
 package main
@@ -38,31 +49,29 @@ import (
 )
 
 func main() {
-	// ---- io.Reader: データの読み取り ----
+	// --- io.Reader: データの読み取り ---
 
 	// strings.NewReader: 文字列を io.Reader として扱う
 	reader := strings.NewReader("Hello, Go!")
 
-	// io.ReadAll: Reader から全データを読み取る
+	// io.ReadAll: Reader から全データを一括読み取り
 	data, err := io.ReadAll(reader)
 	if err != nil {
 		fmt.Println("Read error:", err)
 		return
 	}
-	fmt.Println("ReadAll:", string(data)) // Hello, Go!
+	fmt.Println("ReadAll:", string(data))
 
-	// ---- io.Writer: データの書き込み ----
+	// --- io.Writer: データの書き込み ---
 
 	// bytes.Buffer は io.Writer を実装している
 	var buf bytes.Buffer
-
-	// Write メソッドで書き込み
 	buf.Write([]byte("Hello, "))
 	buf.WriteString("World!")
-	fmt.Println("Buffer:", buf.String()) // Hello, World!
+	fmt.Println("Buffer:", buf.String())
 
-	// ---- io.Copy: Reader → Writer にコピー ----
-
+	// --- io.Copy: Reader → Writer にコピー ---
+	// ファイルコピー、HTTPレスポンスの転送などで頻出
 	src := strings.NewReader("コピーされるデータ")
 	var dst bytes.Buffer
 
@@ -72,66 +81,21 @@ func main() {
 		return
 	}
 	fmt.Printf("Copy: %d bytes → %q\n", n, dst.String())
+
+	// --- io.MultiWriter: 複数のWriterに同時に書き込む ---
+	// ログを画面とファイルの両方に出力する場面で便利
+	var log1, log2 bytes.Buffer
+	multi := io.MultiWriter(&log1, &log2)
+
+	fmt.Fprintln(multi, "このメッセージは両方に書き込まれる")
+	fmt.Println("log1:", log1.String())
+	fmt.Println("log2:", log2.String())
 }
 ```
-
-> **💡 次のステップへ:** 基本的なReader/Writerの使い方を学びました。次は標準ライブラリでの実用的な活用パターンを学びます。
-
-### 応用: 標準ライブラリでの活用
-
-`fmt.Fprintf`、`io.MultiWriter`など、Reader/Writerを活用する標準ライブラリの関数を学びます。
-
-```go
-package main
-
-import (
-	"bytes"
-	"fmt"
-	"io"
-	"os"
-	"strings"
-)
-
-func main() {
-	// ---- fmt.Fprintf: io.Writer に書式付きで書き込む ----
-	var buf bytes.Buffer
-
-	// os.Stdout も bytes.Buffer も io.Writer を満たす
-	fmt.Fprintf(&buf, "名前: %s, 年齢: %d", "田中太郎", 30)
-	fmt.Println("Fprintf:", buf.String())
-
-	// ---- io.MultiWriter: 複数のWriterに同時に書き込む ----
-	var log bytes.Buffer
-
-	// stdout と log の両方に書き込む
-	multi := io.MultiWriter(os.Stdout, &log)
-	fmt.Fprintln(multi, "このメッセージは画面とログの両方に出力されます")
-	fmt.Println("ログ内容:", log.String())
-
-	// ---- io.LimitReader: 読み取りサイズを制限 ----
-	longText := strings.NewReader("これは長いテキストです。最初の10バイトだけ読みます。")
-	limited := io.LimitReader(longText, 10)
-
-	data, _ := io.ReadAll(limited)
-	fmt.Printf("LimitReader: %q\n", string(data))
-
-	// ---- io.TeeReader: 読み取り時に別のWriterにもコピー ----
-	var teeLog bytes.Buffer
-	original := strings.NewReader("TeeReaderのテスト")
-	tee := io.TeeReader(original, &teeLog)
-
-	// tee から読むと、同じデータが teeLog にも書き込まれる
-	result, _ := io.ReadAll(tee)
-	fmt.Printf("TeeReader result: %q\n", string(result))
-	fmt.Printf("TeeReader log:    %q\n", teeLog.String())
-}
-```
-
-> **💡 次のステップへ:** 標準ライブラリの活用を学びました。次は自分でReader/Writerを実装するパターンを学びます。
 
 ### 実践: カスタムReader/Writerの実装
 
-`io.Reader`/`io.Writer`を実装して、データの変換や加工を行うパターンを学びます。
+`io.Reader`/`io.Writer`を実装して、データの変換パイプラインを作るパターンです。
 
 ```go
 package main
@@ -145,6 +109,7 @@ import (
 )
 
 // UpperReader は読み取ったデータを大文字に変換するReader
+// io.Readerを満たす → io.Copy, io.ReadAll などで使える
 type UpperReader struct {
 	reader io.Reader
 }
@@ -153,10 +118,8 @@ func NewUpperReader(r io.Reader) *UpperReader {
 	return &UpperReader{reader: r}
 }
 
-// Read は io.Reader インターフェースを実装
 func (u *UpperReader) Read(p []byte) (int, error) {
 	n, err := u.reader.Read(p)
-	// 読み取ったデータを大文字に変換
 	for i := 0; i < n; i++ {
 		p[i] = byte(unicode.ToUpper(rune(p[i])))
 	}
@@ -173,7 +136,6 @@ func NewCountWriter(w io.Writer) *CountWriter {
 	return &CountWriter{writer: w}
 }
 
-// Write は io.Writer インターフェースを実装
 func (c *CountWriter) Write(p []byte) (int, error) {
 	n, err := c.writer.Write(p)
 	c.ByteCount += n
@@ -182,8 +144,8 @@ func (c *CountWriter) Write(p []byte) (int, error) {
 
 // PrefixWriter は各行の先頭にプレフィックスを追加するWriter
 type PrefixWriter struct {
-	writer    io.Writer
-	prefix    string
+	writer      io.Writer
+	prefix      string
 	atLineStart bool
 }
 
@@ -195,11 +157,7 @@ func (pw *PrefixWriter) Write(p []byte) (int, error) {
 	var written int
 	for _, b := range p {
 		if pw.atLineStart {
-			n, err := pw.writer.Write([]byte(pw.prefix))
-			if err != nil {
-				return written, err
-			}
-			_ = n
+			pw.writer.Write([]byte(pw.prefix))
 			pw.atLineStart = false
 		}
 		n, err := pw.writer.Write([]byte{b})
@@ -215,31 +173,28 @@ func (pw *PrefixWriter) Write(p []byte) (int, error) {
 }
 
 func main() {
-	// ---- UpperReader の使用 ----
+	// --- UpperReader ---
 	src := strings.NewReader("hello, world!")
 	upper := NewUpperReader(src)
-
 	data, _ := io.ReadAll(upper)
 	fmt.Println("UpperReader:", string(data)) // HELLO, WORLD!
 
-	// ---- CountWriter の使用 ----
+	// --- CountWriter ---
 	var buf bytes.Buffer
 	counter := NewCountWriter(&buf)
-
 	fmt.Fprint(counter, "Hello!")
 	fmt.Fprint(counter, " How are you?")
 	fmt.Printf("CountWriter: %q (%d bytes)\n", buf.String(), counter.ByteCount)
 
-	// ---- PrefixWriter の使用 ----
+	// --- PrefixWriter ---
 	var logBuf bytes.Buffer
 	logger := NewPrefixWriter(&logBuf, "[LOG] ")
-
 	fmt.Fprintln(logger, "サーバー起動")
 	fmt.Fprintln(logger, "リクエスト受信")
-	fmt.Fprintln(logger, "レスポンス送信")
 	fmt.Print("PrefixWriter:\n", logBuf.String())
 
-	// ---- Reader/Writerの組み合わせ ----
+	// --- Reader/Writerの組み合わせ ---
+	// カスタムReader/Writerはio.Copyで接続できる
 	fmt.Println("\n--- 組み合わせ ---")
 	src2 := strings.NewReader("go is awesome!")
 	upperReader := NewUpperReader(src2)
@@ -264,21 +219,6 @@ func main() {
 4. `Info(msg string)`, `Warn(msg string)`, `Error(msg string)`: 設定レベル以上のログのみ出力
 5. 出力先を`bytes.Buffer`に変えてテストできることを確認
 
-**ヒント:**
-
-```go
-type Logger struct {
-	out   io.Writer
-	level LogLevel
-}
-
-func (l *Logger) log(level LogLevel, msg string) {
-	if level >= l.level {
-		fmt.Fprintf(l.out, "[%s] %s\n", level, msg)
-	}
-}
-```
-
 **期待される動作:**
 
 - `Logger{level: WARN}`の場合、`Info()`は出力されず、`Warn()`と`Error()`のみ出力
@@ -288,8 +228,8 @@ func (l *Logger) log(level LogLevel, msg string) {
 
 - [ ] `io.Reader`と`io.Writer`はGoで最も重要なインターフェース
 - [ ] `io.ReadAll`、`io.Copy`で簡単にデータを読み書きできる
-- [ ] `io.MultiWriter`、`io.TeeReader`で複数の出力先にデータを流せる
 - [ ] カスタムReader/Writerでデータの変換パイプラインを作れる
+- [ ] `io.MultiWriter`で複数の出力先にデータを流せる
 
 **カテゴリAの完了です！おつかれさまでした！**
 カテゴリBに進む場合: [13. Goroutineの基本](./13-goroutine-basics.md)

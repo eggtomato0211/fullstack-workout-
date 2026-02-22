@@ -2,28 +2,39 @@
 
 ## 🎯 このテーマで学ぶこと
 
-- `errors.New`と`fmt.Errorf`の使い分け
 - カスタムエラー型の定義（Error()メソッドの実装）
 - センチネルエラー（パッケージレベルのエラー変数）
-- エラーに文脈情報を持たせる方法
+- エラーに文脈情報を持たせてHTTPステータスコードと連携する方法
 
-**なぜ重要か:** 基本的なエラーメッセージだけでは、エラーの種類に応じた分岐処理ができません。カスタムエラーを使うことで、「このエラーはNotFoundなのかValidationエラーなのか」をプログラムで判別でき、適切なHTTPステータスコードやユーザーメッセージを返せるようになります。
+## 📖 なぜカスタムエラーを理解する必要があるのか
 
-## 📖 概念
+基本的な`errors.New`や`fmt.Errorf`だけでは、エラーの**種類**を判別できません。実務のAPIサーバーでは「このエラーはNotFoundなのかValidationエラーなのか」によって返すHTTPステータスコードやメッセージが変わります。
 
-Goのerrorインターフェースは`Error() string`を実装するだけで満たせます。これを利用して、エラーの種類や詳細情報を持つカスタムエラー型を作成できます。また、パッケージレベルでエラー変数を定義する「センチネルエラー」パターンもよく使われます。
+### こう書かないとどうなるか
 
-**よくある誤解:**
+```go
+// 文字列だけのエラーでは種類の判別ができない
+err := errors.New("user not found")
 
-- ❌ 「エラーはstringだけで十分」→ 型で分岐したい場面ではカスタムエラーが必要
-- ❌ 「全てのエラーにカスタム型を作る」→ 分岐が不要な場面では`errors.New`で十分
-- ❌ 「センチネルエラーを大量に定義する」→ 必要最小限にとどめる
+// こうするしかない → 脆い（メッセージを変えたら壊れる）
+if err.Error() == "user not found" {
+    w.WriteHeader(404)
+}
+
+// カスタムエラー型なら → 型で安全に判別できる
+if _, ok := err.(*NotFoundError); ok {
+    w.WriteHeader(404) // 型が合えば確実にNotFound
+}
+```
+
+### センチネルエラー vs カスタムエラー型
+
+- **センチネルエラー**（`var ErrNotFound = errors.New("not found")`）: 単純な種類の判別に。詳細情報が不要な場面
+- **カスタムエラー型**（`type ValidationError struct{...}`）: エラーに追加情報（フィールド名、IDなど）を持たせたい場面
 
 ## 💡 コード例
 
-### 基本: センチネルエラー
-
-パッケージレベルでエラー変数を定義し、エラーの種類を判別できるようにします。
+### 基本: センチネルエラーとカスタムエラー型
 
 ```go
 package main
@@ -33,98 +44,44 @@ import (
 	"fmt"
 )
 
-// センチネルエラー: パッケージレベルで定義する定数的なエラー
-// 命名規則: Err + 名前（例: ErrNotFound, ErrUnauthorized）
+// --- センチネルエラー ---
+// 命名規則: Err + 名前
 var (
 	ErrNotFound     = errors.New("not found")
 	ErrUnauthorized = errors.New("unauthorized")
-	ErrForbidden    = errors.New("forbidden")
 )
 
-type User struct {
-	ID   int
-	Name string
-	Role string
-}
+// --- カスタムエラー型 ---
+// エラーに詳細情報を持たせる
 
-var users = map[int]*User{
-	1: {ID: 1, Name: "田中太郎", Role: "admin"},
-	2: {ID: 2, Name: "鈴木花子", Role: "user"},
-}
-
-func findUser(id int) (*User, error) {
-	user, ok := users[id]
-	if !ok {
-		return nil, ErrNotFound // センチネルエラーを返す
-	}
-	return user, nil
-}
-
-func checkPermission(user *User, action string) error {
-	if user.Role != "admin" && action == "delete" {
-		return ErrForbidden
-	}
-	return nil
-}
-
-func main() {
-	// センチネルエラーとの比較で分岐処理
-	user, err := findUser(99)
-	if err != nil {
-		if err == ErrNotFound {
-			fmt.Println("ユーザーが見つかりません")
-		} else {
-			fmt.Println("予期しないエラー:", err)
-		}
-		return
-	}
-	fmt.Println("Found:", user.Name)
-}
-```
-
-> **💡 次のステップへ:** センチネルエラーで基本的なエラー分岐を学びました。次はエラーに詳細情報を持たせるカスタムエラー型を学びます。
-
-### 応用: カスタムエラー型
-
-エラーに詳細情報（ステータスコード、フィールド名など）を持たせるカスタム型を定義します。
-
-```go
-package main
-
-import "fmt"
-
-// ValidationError はバリデーションエラーの詳細を持つカスタムエラー型
+// ValidationError はバリデーションエラーの詳細を持つ
 type ValidationError struct {
-	Field   string // エラーが発生したフィールド名
-	Message string // エラーメッセージ
+	Field   string // どのフィールドがエラーか
+	Message string // 何が問題か
 }
 
-// Error() を実装して error インターフェースを満たす
+// Error() を実装 → error インターフェースを満たす
 func (e *ValidationError) Error() string {
 	return fmt.Sprintf("validation error: %s - %s", e.Field, e.Message)
 }
 
 // NotFoundError はリソースが見つからないエラー
 type NotFoundError struct {
-	Resource string // リソース種別（user, product 等）
-	ID       int    // 検索に使ったID
+	Resource string // user, product など
+	ID       int
 }
 
 func (e *NotFoundError) Error() string {
 	return fmt.Sprintf("%s not found: id=%d", e.Resource, e.ID)
 }
 
+// --- 使用例 ---
+
 func validateAge(age int) error {
-	if age < 0 {
+	if age < 0 || age > 150 {
 		return &ValidationError{
 			Field:   "age",
-			Message: "must be non-negative",
-		}
-	}
-	if age > 150 {
-		return &ValidationError{
-			Field:   "age",
-			Message: fmt.Sprintf("must be <= 150, got %d", age),
+			Message: fmt.Sprintf("must be 0-150, got %d", age),
 		}
 	}
 	return nil
@@ -140,16 +97,14 @@ func findProduct(id int) (string, error) {
 }
 
 func main() {
-	// ValidationError の型アサーションでフィールド名を取得
+	// 型アサーションでカスタムエラーの詳細にアクセス
 	err := validateAge(-5)
 	if err != nil {
-		// 型アサーションでカスタムエラーの詳細にアクセス
 		if ve, ok := err.(*ValidationError); ok {
-			fmt.Printf("フィールド「%s」のエラー: %s\n", ve.Field, ve.Message)
+			fmt.Printf("フィールド「%s」: %s\n", ve.Field, ve.Message)
 		}
 	}
 
-	// NotFoundError の型アサーションでリソース情報を取得
 	_, err = findProduct(99)
 	if err != nil {
 		if nfe, ok := err.(*NotFoundError); ok {
@@ -159,11 +114,9 @@ func main() {
 }
 ```
 
-> **💡 次のステップへ:** カスタムエラー型の定義と型アサーションでの分岐を学びました。次は実務でのHTTPステータスコードとの連携パターンを学びます。
-
 ### 実践: HTTPレスポンスとカスタムエラーの連携
 
-APIサーバーでカスタムエラーをHTTPステータスコードに変換するパターンを学びます。
+APIサーバーでカスタムエラーをHTTPステータスコードに変換するパターンです。実務で最もよく使うカスタムエラーの使い方です。
 
 ```go
 package main
@@ -171,17 +124,21 @@ package main
 import "fmt"
 
 // AppError はアプリケーション共通のエラー型
+// なぜCode/Message/Detailを分けるか：
+// - Code: HTTPステータスコード（プログラムが使う）
+// - Message: ユーザー向けメッセージ（クライアントに返す）
+// - Detail: 開発者向け詳細（ログに出す、クライアントには返さない）
 type AppError struct {
-	Code    int    // HTTPステータスコード
-	Message string // ユーザー向けメッセージ
-	Detail  string // 開発者向け詳細情報
+	Code    int
+	Message string
+	Detail  string
 }
 
 func (e *AppError) Error() string {
 	return fmt.Sprintf("[%d] %s: %s", e.Code, e.Message, e.Detail)
 }
 
-// エラー生成のヘルパー関数
+// ヘルパー関数でエラー生成を統一
 func NewBadRequestError(detail string) *AppError {
 	return &AppError{Code: 400, Message: "Bad Request", Detail: detail}
 }
@@ -190,11 +147,7 @@ func NewNotFoundError(detail string) *AppError {
 	return &AppError{Code: 404, Message: "Not Found", Detail: detail}
 }
 
-func NewInternalError(detail string) *AppError {
-	return &AppError{Code: 500, Message: "Internal Server Error", Detail: detail}
-}
-
-// ---- ビジネスロジック ----
+// --- ビジネスロジック ---
 
 type Product struct {
 	ID    int
@@ -217,15 +170,13 @@ func getProduct(id int) (*Product, error) {
 	return product, nil
 }
 
-// handleRequest はHTTPハンドラーをシミュレート
+// HTTPハンドラーをシミュレート
 func handleRequest(productID int) {
 	product, err := getProduct(productID)
 	if err != nil {
-		// AppErrorならステータスコードに応じた処理
 		if appErr, ok := err.(*AppError); ok {
 			fmt.Printf("HTTP %d: %s (%s)\n", appErr.Code, appErr.Message, appErr.Detail)
 		} else {
-			// 予期しないエラーは500で返す
 			fmt.Printf("HTTP 500: Internal Server Error (%v)\n", err)
 		}
 		return

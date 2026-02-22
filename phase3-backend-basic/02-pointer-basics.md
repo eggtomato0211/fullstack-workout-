@@ -5,66 +5,34 @@
 - ポインタの基本（`&`と`*`の使い方）
 - 値渡しとポインタ渡しの違い
 - ポインタを使うべき場面の判断基準
-- nilポインタの扱いと安全なアクセス
 
-**なぜ重要か:** Goは値渡しがデフォルトの言語です。構造体を関数に渡すとコピーが作られるため、「変更を呼び出し元に反映したい」「大きな構造体のコピーを避けたい」場面ではポインタが必須です。メソッドのレシーバーやJSON Unmarshalなど、実務で頻繁に使います。
+## 📖 なぜポインタを理解する必要があるのか
 
-## 📖 概念
+Goは値渡しがデフォルトの言語です。構造体を関数に渡すと**コピーが作られる**ため、関数内で変更しても呼び出し元には反映されません。
 
-ポインタは値が格納されているメモリアドレスを保持する変数です。`&`で変数のアドレスを取得し、`*`でアドレスが指す値にアクセスします。
+### こう書かないとどうなるか
 
-**背景と設計意図:** CやC++のようなポインタ演算はGoにはありませんが、参照の概念は残しています。これにより、不必要なコピーを避けつつ、ポインタ演算の危険性を排除しています。
+```go
+func updateAge(u User) {
+    u.Age = 31  // これはコピーを変更しているだけ
+}
 
-**実務での活用場面:** 構造体のメソッドレシーバー、関数への構造体の渡し方、JSONのデコード先指定、データベースのNULL表現（`*string`）など。
+user := User{Name: "田中", Age: 30}
+updateAge(user)
+fmt.Println(user.Age) // 30 ← 変わっていない！
+```
 
-**よくある誤解:**
+「変更したのに反映されない」というバグの原因はほぼこれです。変更を呼び出し元に反映するにはポインタ渡しが必要です。
 
-- ❌ 「常にポインタを使うべき」→ 小さい構造体やプリミティブは値渡しの方が効率的
-- ❌ 「ポインタ = 参照型」→ Goのポインタは明示的で、暗黙の参照渡しはない（map/slice/channelは例外）
-- ❌ 「nilポインタは怖い」→ 適切にチェックすれば安全に扱える
+### ポインタのもう一つの用途：「値がない」の表現
+
+Goの`string`のゼロ値は空文字`""`、`int`のゼロ値は`0`です。しかし「空文字」と「未設定」は意味が違います。`*string`（ポインタ型）にすることで、`nil`=未設定、`""`=空文字と区別できます。データベースのNULL値やJSONのnullを扱う場面で必須です。
 
 ## 💡 コード例
 
-### 基本: ポインタの基礎
+### 基本: ポインタの基礎と値渡し vs ポインタ渡し
 
-`&`（アドレス演算子）と`*`（間接参照演算子）の基本的な使い方を学びます。
-
-```go
-package main
-
-import "fmt"
-
-func main() {
-	x := 42
-
-	// &x で x のメモリアドレスを取得
-	p := &x
-	fmt.Println("xの値:", x)       // 42
-	fmt.Println("xのアドレス:", p)   // 0xc000018088（実行時に異なる）
-	fmt.Println("pが指す値:", *p)   // 42
-
-	// *p でポインタが指す値を変更 → 元の x も変わる
-	*p = 100
-	fmt.Println("xの値:", x) // 100
-
-	// ポインタのゼロ値は nil
-	var q *int
-	fmt.Println("qの値:", q) // <nil>
-
-	// nilポインタへのアクセスはpanicになるのでチェックが必要
-	if q != nil {
-		fmt.Println(*q)
-	} else {
-		fmt.Println("qはnilです")
-	}
-}
-```
-
-> **💡 次のステップへ:** ポインタの基本操作を学びました。次は関数に値を渡す際の「値渡し」と「ポインタ渡し」の違いを理解します。
-
-### 応用: 値渡しとポインタ渡し
-
-Goの関数は引数を常にコピーして渡します（値渡し）。ポインタを渡すことで、関数内での変更を呼び出し元に反映させることができます。
+`&`でアドレスを取得し、`*`で値にアクセスする基本操作と、値渡し・ポインタ渡しの違いを学びます。
 
 ```go
 package main
@@ -76,36 +44,49 @@ type User struct {
 	Age  int
 }
 
-// 値渡し: 引数のコピーが作られる → 元の値は変わらない
-func incrementAgeByValue(u User) {
-	u.Age++ // コピーのAgeを変更しているだけ
+// 値渡し：コピーを受け取るので、元の値は変わらない
+func incrementByValue(u User) {
+	u.Age++
 	fmt.Println("関数内:", u.Age)
 }
 
-// ポインタ渡し: アドレスを渡す → 元の値を変更できる
-func incrementAgeByPointer(u *User) {
-	u.Age++ // 元のUserのAgeを変更
+// ポインタ渡し：アドレスを受け取るので、元の値を変更できる
+// なぜ*Userか → 「この関数はUserを変更する」ことを型で表現している
+func incrementByPointer(u *User) {
+	u.Age++
 	fmt.Println("関数内:", u.Age)
 }
 
 func main() {
+	// --- ポインタの基礎 ---
+	x := 42
+	p := &x          // &でアドレスを取得
+	fmt.Println(*p)  // *で値にアクセス → 42
+	*p = 100         // ポインタ経由で値を変更
+	fmt.Println(x)   // 100（元の変数も変わる）
+
+	// ポインタのゼロ値はnil
+	var q *int
+	fmt.Println(q)   // <nil>
+	// *q とするとpanicになるので、必ずnilチェックする
+	if q != nil {
+		fmt.Println(*q)
+	}
+
+	// --- 値渡し vs ポインタ渡し ---
 	user := User{Name: "田中太郎", Age: 30}
 
-	// 値渡し: 関数内で変更しても元のuserは変わらない
-	incrementAgeByValue(user)
-	fmt.Println("値渡し後:", user.Age) // 30（変わっていない）
+	incrementByValue(user)
+	fmt.Println("値渡し後:", user.Age)    // 30（変わらない）
 
-	// ポインタ渡し: 関数内の変更が元のuserに反映される
-	incrementAgeByPointer(&user)
+	incrementByPointer(&user)           // &でアドレスを渡す
 	fmt.Println("ポインタ渡し後:", user.Age) // 31（変わった）
 }
 ```
 
-> **💡 次のステップへ:** 値渡しとポインタ渡しの違いを理解しました。次は実務的な場面で「ポインタを使うべき場面」を判断する基準を学びます。
+### 実践: nilで「値がない」を表現する
 
-### 実践: ポインタの使いどころ
-
-実務でのポインタの使い方として、「値がないこと（nil）を表現する」パターンと、「大きな構造体のコピーを避ける」パターンを学びます。
+APIレスポンスやDBのNULL値を扱う場面では、ポインタ型で「値があるか・ないか」を区別します。
 
 ```go
 package main
@@ -116,7 +97,7 @@ import (
 )
 
 // UserProfile はAPIレスポンスを想定した構造体
-// ポインタ型フィールドで「値がない（null）」を表現できる
+// ポインタ型フィールドでnull/未設定を表現
 type UserProfile struct {
 	Name     string  `json:"name"`
 	Email    string  `json:"email"`
@@ -124,19 +105,16 @@ type UserProfile struct {
 	Age      *int    `json:"age"`      // nullの可能性がある → ポインタ型
 }
 
-// UpdateProfile はプロフィールを更新する
-// 構造体が大きい場合やフィールドを変更する場合はポインタレシーバー
 func (u *UserProfile) UpdateProfile(name, email string) {
 	u.Name = name
 	u.Email = email
 }
 
-// ヘルパー: stringのポインタを返す
+// ヘルパー関数：リテラル値から直接ポインタを作れないGoの制約を回避
 func stringPtr(s string) *string { return &s }
-func intPtr(i int) *int          { return &i }
 
 func main() {
-	// JSONからのデコード: nilフィールドの活用
+	// JSONのnullはポインタ型ならnilに、非ポインタ型ならゼロ値になる
 	jsonData := `{"name": "田中太郎", "email": "tanaka@example.com", "nickname": null, "age": 30}`
 
 	var profile UserProfile
@@ -147,7 +125,8 @@ func main() {
 
 	fmt.Printf("Name: %s\n", profile.Name)
 
-	// ポインタ型フィールドはnilチェックが必要
+	// ポインタ型フィールドは必ずnilチェックしてからアクセス
+	// nilのまま*profile.Nicknameとするとpanicになる
 	if profile.Nickname != nil {
 		fmt.Printf("Nickname: %s\n", *profile.Nickname)
 	} else {
@@ -170,36 +149,25 @@ func main() {
 
 **要件:**
 
-1. `BankAccount`構造体: `Owner string`, `Balance int`（残高）を持つ
+1. `BankAccount`構造体: `Owner string`, `Balance int`を持つ
 2. `Deposit(amount int) error`: 入金処理（負の値はエラー）。呼び出し元のBalanceが変わること
-3. `Withdraw(amount int) error`: 出金処理（残高不足・負の値はエラー）。呼び出し元のBalanceが変わること
+3. `Withdraw(amount int) error`: 出金処理（残高不足・負の値はエラー）
 4. `Transfer(to *BankAccount, amount int) error`: 送金処理。自分から引いて相手に足す
 
 **ヒント:**
 
 ```go
-type BankAccount struct {
-	Owner   string
-	Balance int
-}
-
+// ポインタレシーバーで元の値を変更
 func (a *BankAccount) Deposit(amount int) error {
-	// ポインタレシーバーで元の値を変更
+	// ...
 }
 ```
-
-**期待される動作:**
-
-- `Deposit(1000)` → 残高が1000増える
-- `Withdraw(500)` → 残高が500減る
-- `Withdraw(10000)` → 残高不足エラー
-- `Transfer(&otherAccount, 300)` → 自分-300、相手+300
 
 ## ✅ 重要ポイント
 
 - [ ] `&`でアドレス取得、`*`で値にアクセス
-- [ ] 値渡し：コピーが作られる。ポインタ渡し：元の値を変更できる
-- [ ] ポインタ型フィールド（`*string`等）でnull/未設定を表現する
-- [ ] nilポインタにアクセスするとpanicになるので必ずチェックする
+- [ ] 値渡しはコピー、ポインタ渡しは元の値を変更できる
+- [ ] ポインタ型（`*string`等）でnull/未設定を表現する
+- [ ] nilポインタにアクセスするとpanicするので必ずチェック
 
 **次のテーマ:** [03. メソッドとレシーバー](./03-methods-and-receivers.md)

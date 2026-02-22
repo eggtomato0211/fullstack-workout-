@@ -4,71 +4,40 @@
 
 - メソッドの定義方法と関数との違い
 - 値レシーバーとポインタレシーバーの使い分け
-- レシーバーの命名規則
-- メソッドセットの概念
+- レシーバーの命名規則とメソッドチェーン
 
-**なぜ重要か:** Goのメソッドはインターフェースの実装に直結します。値レシーバーとポインタレシーバーの違いを正しく理解しないと、意図しないバグ（変更が反映されない）やインターフェース実装の失敗が起きます。
+## 📖 なぜレシーバーの使い分けを理解する必要があるのか
 
-## 📖 概念
+Goにはクラスがないため、型にメソッドを付与することで振る舞いを定義します。値レシーバーとポインタレシーバーの選択は「この操作は元のデータを変更するのか？」を型レベルで表現します。
 
-メソッドは特定の型に紐づいた関数です。レシーバーで「どの型のメソッドか」を指定します。値レシーバーはコピーを受け取り、ポインタレシーバーは元の値への参照を受け取ります。
+### こう書かないとどうなるか
 
-**背景と設計意図:** Goにはクラスがないため、型にメソッドを付与することで振る舞いを定義します。値レシーバーとポインタレシーバーの明示的な選択は、「この操作は元のデータを変更するのか」を型レベルで表現します。
+```go
+// 値レシーバーで状態を変更しようとすると...
+func (c Counter) Increment() {
+    c.value++ // コピーのvalueを変更しているだけ
+}
 
-**実務での活用場面:** ドメインモデルのビジネスロジック、リポジトリパターンのメソッド定義、サービス層のメソッド定義など。
+counter := Counter{value: 0}
+counter.Increment()
+fmt.Println(counter.value) // 0 ← 変わっていない！
+```
 
-**よくある誤解:**
+値レシーバーはコピーを受け取るため、内部で変更しても元の構造体には反映されません。状態を変更するメソッドは**必ずポインタレシーバー**にする必要があります。
 
-- ❌ 「全部ポインタレシーバーにすればいい」→ 読み取り専用のメソッドは値レシーバーが適切
-- ❌ 「レシーバーは`this`や`self`と命名する」→ Goでは型名の頭文字1-2文字が慣習（例: `User` → `u`）
-- ❌ 「値レシーバーとポインタレシーバーは混在してよい」→ 一貫性のためどちらかに統一するのが推奨
+### 使い分けの基本原則
+
+- **値を変更する** → ポインタレシーバー（`func (c *Counter) Increment()`）
+- **読み取り専用** → 値レシーバー（`func (c Counter) Value() int`）
+- **迷ったら** → ポインタレシーバー（一貫性のため統一する方が安全）
+
+レシーバー名は`this`や`self`ではなく、型名の頭文字1-2文字を使います（`User` → `u`、`Counter` → `c`）。これはGoの慣習です。
 
 ## 💡 コード例
 
-### 基本: メソッドの定義
+### 基本: 値レシーバーとポインタレシーバー
 
-構造体にメソッドを定義する基本的な方法を学びます。関数との違いは「レシーバー」があるかどうかです。
-
-```go
-package main
-
-import "fmt"
-
-type Rectangle struct {
-	Width  float64
-	Height float64
-}
-
-// 値レシーバー: Rectangle のコピーを受け取る
-// → 元の値を変更しない読み取り専用の処理に適している
-func (r Rectangle) Area() float64 {
-	return r.Width * r.Height
-}
-
-// 値レシーバー: 読み取り専用
-func (r Rectangle) Perimeter() float64 {
-	return 2 * (r.Width + r.Height)
-}
-
-// 値レシーバー: 文字列表現を返す（fmt.Stringer インターフェース）
-func (r Rectangle) String() string {
-	return fmt.Sprintf("Rectangle(%.1f x %.1f)", r.Width, r.Height)
-}
-
-func main() {
-	rect := Rectangle{Width: 10, Height: 5}
-
-	fmt.Println(rect)              // Rectangle(10.0 x 5.0)
-	fmt.Println("面積:", rect.Area())      // 50
-	fmt.Println("周長:", rect.Perimeter()) // 30
-}
-```
-
-> **💡 次のステップへ:** 値レシーバーでの読み取り専用メソッドを学びました。次はポインタレシーバーで「元の値を変更する」メソッドを定義します。
-
-### 応用: ポインタレシーバーの活用
-
-構造体の状態を変更するメソッドにはポインタレシーバーを使います。値レシーバーとの違いを明確に理解しましょう。
+読み取り専用メソッドと状態変更メソッドの違いを明確にします。
 
 ```go
 package main
@@ -80,28 +49,24 @@ type Counter struct {
 	name  string
 }
 
-// NewCounter はCounterのコンストラクタ
 func NewCounter(name string) *Counter {
 	return &Counter{name: name, value: 0}
 }
 
-// ポインタレシーバー: 元の値を変更する
+// ポインタレシーバー：元の値を変更する
 func (c *Counter) Increment() {
 	c.value++
 }
 
-// ポインタレシーバー: 元の値を変更する
 func (c *Counter) Add(n int) {
 	c.value += n
 }
 
-// ポインタレシーバー: 元の値を変更する
 func (c *Counter) Reset() {
 	c.value = 0
 }
 
-// 値レシーバー: 読み取り専用（値を変更しない）
-// ただし、一貫性のためポインタレシーバーに統一することも多い
+// 値レシーバー：読み取り専用（値を変更しない）
 func (c Counter) Value() int {
 	return c.value
 }
@@ -112,24 +77,22 @@ func (c Counter) String() string {
 
 func main() {
 	counter := NewCounter("アクセス数")
-	fmt.Println(counter)       // アクセス数: 0
+	fmt.Println(counter) // アクセス数: 0
 
 	counter.Increment()
 	counter.Increment()
 	counter.Add(10)
-	fmt.Println(counter)       // アクセス数: 12
+	fmt.Println(counter)              // アクセス数: 12
 	fmt.Println("現在値:", counter.Value()) // 12
 
 	counter.Reset()
-	fmt.Println(counter)       // アクセス数: 0
+	fmt.Println(counter) // アクセス数: 0
 }
 ```
 
-> **💡 次のステップへ:** ポインタレシーバーによる状態変更を学びました。次の実践では、値レシーバーとポインタレシーバーの選択基準を実用的な例で確認します。
+### 実践: メソッドチェーンとレシーバーの選択基準
 
-### 実践: レシーバーの選択基準
-
-実務で「どちらのレシーバーを使うべきか」の判断基準を、具体的なユースケースで学びます。
+ポインタレシーバーで自身のポインタを返すことで、メソッドチェーンが実現できます。実務でのビルダーパターンによく使われます。
 
 ```go
 package main
@@ -139,20 +102,20 @@ import (
 	"strings"
 )
 
-// ---- ケース1: 小さい構造体 → 値レシーバーでOK ----
+// --- 小さい構造体：値レシーバーでOK ---
 
 type Point struct {
 	X, Y float64
 }
 
-// 小さい構造体の読み取り専用メソッド → 値レシーバー
+// 小さい構造体 + 読み取り専用 → 値レシーバーが適切
 func (p Point) Distance(other Point) float64 {
 	dx := p.X - other.X
 	dy := p.Y - other.Y
-	return dx*dx + dy*dy // 簡略化のため平方根は省略
+	return dx*dx + dy*dy
 }
 
-// ---- ケース2: 大きい構造体 or 変更あり → ポインタレシーバー ----
+// --- 大きい構造体 or 変更あり：ポインタレシーバー ---
 
 type EmailBuilder struct {
 	to      []string
@@ -160,10 +123,10 @@ type EmailBuilder struct {
 	body    string
 }
 
-// ポインタレシーバー + メソッドチェーン: 自身のポインタを返す
+// ポインタレシーバー + 自身を返す → メソッドチェーンが可能
 func (b *EmailBuilder) To(addresses ...string) *EmailBuilder {
 	b.to = append(b.to, addresses...)
-	return b
+	return b // 自分自身のポインタを返す
 }
 
 func (b *EmailBuilder) Subject(subject string) *EmailBuilder {
@@ -182,12 +145,12 @@ func (b *EmailBuilder) String() string {
 }
 
 func main() {
-	// ケース1: 値型として扱う
+	// 値レシーバーの例
 	p1 := Point{X: 0, Y: 0}
 	p2 := Point{X: 3, Y: 4}
-	fmt.Println("距離²:", p1.Distance(p2)) // 25
+	fmt.Println("距離²:", p1.Distance(p2))
 
-	// ケース2: メソッドチェーンで組み立て
+	// メソッドチェーンの例
 	email := &EmailBuilder{}
 	email.
 		To("user@example.com", "admin@example.com").
@@ -203,38 +166,24 @@ func main() {
 
 **要件:**
 
-1. `Task`構造体: `Title string`, `Done bool`, `Priority int`（1-5）を持つ
-2. `NewTask(title string, priority int) (*Task, error)`: コンストラクタ。タイトル空 or 優先度が1-5以外でエラー
+1. `Task`構造体: `Title string`, `Done bool`, `Priority int`（1-5）
+2. `NewTask(title string, priority int) (*Task, error)`: タイトル空 or 優先度が1-5以外でエラー
 3. `Complete()`: タスクを完了にする（ポインタレシーバー）
-4. `IsHighPriority() bool`: 優先度が4以上なら`true`（値レシーバー）
-5. `String() string`: `"[x] タスク名 (優先度:3)"` 形式の文字列を返す
+4. `IsHighPriority() bool`: 優先度4以上なら`true`（値レシーバー）
+5. `String() string`: `"[x] タスク名 (優先度:3)"` 形式
 
 **ヒント:**
 
 ```go
-// 値を変更するメソッド → ポインタレシーバー
-func (t *Task) Complete() {
-	// ...
-}
-
-// 読み取り専用 → 値レシーバー
-func (t Task) IsHighPriority() bool {
-	// ...
-}
+func (t *Task) Complete() { /* ポインタレシーバーで変更 */ }
+func (t Task) IsHighPriority() bool { /* 値レシーバーで読み取り */ }
 ```
-
-**期待される動作:**
-
-- `NewTask("Go学習", 3)` → 正常に作成
-- `task.Complete()` → `Done`が`true`になる
-- `task.IsHighPriority()` → 優先度4以上で`true`
-- `fmt.Println(task)` → `"[x] Go学習 (優先度:3)"`
 
 ## ✅ 重要ポイント
 
 - [ ] 値を変更するメソッドはポインタレシーバー、読み取り専用は値レシーバー
 - [ ] レシーバー名は型名の頭文字1-2文字（`User` → `u`）
 - [ ] 1つの型ではレシーバーの種類を統一するのが推奨
-- [ ] メソッドチェーンでは`*自分の型`を返す
+- [ ] メソッドチェーンでは自身のポインタを返す
 
 **次のテーマ:** [04. Interfaceの基本](./04-interface-basics.md)

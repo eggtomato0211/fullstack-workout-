@@ -2,77 +2,45 @@
 
 ## 🎯 このテーマで学ぶこと
 
-- panicの発生とプログラムの中断
-- recoverによるpanicの捕捉
-- deferと組み合わせたrecoverパターン
+- panicの発生とrecoverによる捕捉
 - panicを使うべき場面と避けるべき場面
+- deferと組み合わせたrecoverパターン（HTTPミドルウェア）
 
-**なぜ重要か:** Goの通常のエラーハンドリングは`error`型を使いますが、プログラムの続行が不可能な致命的エラー（設定の不備、不変条件の違反など）にはpanicが使われます。また、HTTPサーバーのミドルウェアでpanicをrecoverし、500エラーとして返すのは実務での標準パターンです。
+## 📖 なぜpanic/recoverを理解する必要があるのか
 
-## 📖 概念
+Goの通常のエラーハンドリングは`error`型を使いますが、**プログラムの続行が不可能な致命的エラー**にはpanicが使われます。また、HTTPサーバーでpanicをrecoverし500エラーとして返すのは実務の標準パターンです。
 
-`panic`はプログラムの実行を中断し、スタックを巻き戻す仕組みです。`recover`はpanic中のスタック巻き戻しを止め、正常な実行に復帰させます。recoverは`defer`の中でのみ動作します。
+### こう書かないとどうなるか
 
-**背景と設計意図:** Goはエラーを戻り値で扱うことを推奨しますが、「プログラムが回復不能な状態」ではpanicが適切です。recoverはサーバーアプリケーションでリクエスト単位のpanicをキャッチし、サーバー全体がクラッシュしないようにするために使います。
+```go
+// panicを使いすぎると → try/catchのように乱用してしまう
+func findUser(id int) string {
+    user, ok := users[id]
+    if !ok {
+        panic("user not found") // ← これは通常のエラー。panicは不適切
+    }
+    return user
+}
 
-**よくある誤解:**
+// 正しくは error で返す
+func findUser(id int) (string, error) {
+    user, ok := users[id]
+    if !ok {
+        return "", fmt.Errorf("user not found: id=%d", id)
+    }
+    return user, nil
+}
+```
 
-- ❌ 「panicはtry/catchの代わりに使える」→ 通常のエラーにはerror型を使う。panicは例外的状況のみ
-- ❌ 「recoverでどこからでもpanicを捕捉できる」→ deferの中でのみ動作する
-- ❌ 「panicは使ってはいけない」→ 適切な場面（初期化の失敗、不変条件の違反）では有用
+### panicの使い分け
+
+- **panicが適切**: 設定の不備（必須環境変数がない）、不変条件の違反（プログラマのミス）
+- **panicが不適切**: ユーザー入力のエラー、ファイルが見つからない、ネットワークエラーなど通常起こりうる事象
+- **命名慣習**: `Must`で始まる関数はpanic可能性を示す（`regexp.MustCompile`など）
 
 ## 💡 コード例
 
 ### 基本: panicとrecoverの動作
-
-panicの発生とrecoverによる捕捉の基本パターンを学びます。
-
-```go
-package main
-
-import "fmt"
-
-// safeDivide はゼロ除算でもpanicしないようにrecoverで保護
-func safeDivide(a, b int) (result int, err error) {
-	// deferの中でrecoverを呼ぶ
-	defer func() {
-		if r := recover(); r != nil {
-			// panicから回復し、エラーとして返す
-			err = fmt.Errorf("recovered from panic: %v", r)
-		}
-	}()
-
-	// ゼロ除算は runtime panic を引き起こす
-	return a / b, nil
-}
-
-func main() {
-	// 正常ケース
-	result, err := safeDivide(10, 3)
-	if err != nil {
-		fmt.Println("Error:", err)
-	} else {
-		fmt.Println("10 / 3 =", result) // 3
-	}
-
-	// panicが発生するケース（ゼロ除算）
-	result, err = safeDivide(10, 0)
-	if err != nil {
-		fmt.Println("Error:", err) // recovered from panic: runtime error: integer divide by zero
-	} else {
-		fmt.Println("結果:", result)
-	}
-
-	// recoverしたのでプログラムは続行できる
-	fmt.Println("プログラムは続行中")
-}
-```
-
-> **💡 次のステップへ:** recoverの基本を学びました。次は「panicを使うべき場面」と「使うべきでない場面」を学びます。
-
-### 応用: panicを使うべき場面
-
-panicは「プログラムの設定が不正」「不変条件が満たされていない」など、プログラマのミスを示す場面で使います。
 
 ```go
 package main
@@ -82,78 +50,81 @@ import (
 	"os"
 )
 
-// ---- panicが適切な場面 ----
+// recoverはdeferの中でのみ動作する
+func safeDivide(a, b int) (result int, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			// panicから回復し、エラーとして返す
+			err = fmt.Errorf("recovered from panic: %v", r)
+		}
+	}()
+
+	return a / b, nil // ゼロ除算は runtime panic を引き起こす
+}
+
+// --- panicが適切な場面: Must パターン ---
 
 type Config struct {
 	DatabaseURL string
 	Port        int
 }
 
-// MustLoadConfig は設定の読み込みに失敗したらpanicする
-// 命名規則: Must で始まる関数はpanic可能性を示す
+// Must で始まる関数はpanic可能性を示す慣習
+// アプリ起動時の設定読み込みなど、失敗したら続行不可の場面で使う
 func MustLoadConfig() *Config {
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
-		// アプリケーション起動時に必須の設定がない → 続行不可 → panic
 		panic("DATABASE_URL environment variable is required")
 	}
 	return &Config{DatabaseURL: dbURL, Port: 8080}
 }
 
-// MustParseTemplate はテンプレートのパースに失敗したらpanicする
-func MustParseTemplate(name, content string) string {
-	if content == "" {
-		panic(fmt.Sprintf("template %q is empty", name))
-	}
-	return content
-}
-
-// ---- panicが不適切な場面 ----
-
-// findUser でのpanicは不適切: ユーザーが見つからないのは通常の事象
-// → error で返すべき
+// --- panicが不適切な場面: 通常のエラーはerrorで返す ---
 func findUser(id int) (string, error) {
 	users := map[int]string{1: "田中太郎"}
 	name, ok := users[id]
 	if !ok {
-		return "", fmt.Errorf("user not found: id=%d", id) // error で返す（panicしない）
+		return "", fmt.Errorf("user not found: id=%d", id) // panicしない
 	}
 	return name, nil
 }
 
 func main() {
-	// Must関数の使用例（環境変数が未設定だとpanic）
-	// 実際にはプログラム起動時に呼ぶ
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Println("起動エラー:", r)
-		}
-	}()
-
-	// panicが不適切な場面: 通常のエラーとして処理
-	_, err := findUser(99)
+	// 正常ケース
+	result, err := safeDivide(10, 3)
 	if err != nil {
-		fmt.Println("通常のエラー:", err) // error で処理
+		fmt.Println("Error:", err)
+	} else {
+		fmt.Println("10 / 3 =", result)
 	}
 
-	// panicが適切な場面: 設定の読み込み失敗
-	fmt.Println("設定を読み込みます...")
-	_ = MustLoadConfig() // DATABASE_URL が未設定なら panic
+	// panicが発生するケース → recoverしてエラーとして返す
+	result, err = safeDivide(10, 0)
+	if err != nil {
+		fmt.Println("Error:", err) // recovered from panic: ...
+	}
+
+	// recoverしたのでプログラムは続行できる
+	fmt.Println("プログラムは続行中")
+
+	// 通常のエラーはerrorで処理
+	_, err = findUser(99)
+	if err != nil {
+		fmt.Println("通常のエラー:", err)
+	}
 }
 ```
 
-> **💡 次のステップへ:** panicの使い分けを学びました。次はHTTPサーバーでのrecoverミドルウェアの実装パターンを学びます。
-
 ### 実践: HTTPミドルウェアでのrecover
 
-実際のWebサーバーでpanic recoveryミドルウェアを実装するパターンを学びます。
+実際のWebサーバーでpanic recoveryミドルウェアを実装するパターンです。リクエスト処理中のpanicをキャッチし、サーバー全体がクラッシュしないようにします。
 
 ```go
 package main
 
 import "fmt"
 
-// ---- HTTPをシミュレートする簡易的な型 ----
+// --- HTTPをシミュレートする簡易的な型 ---
 
 type Request struct {
 	Path   string
@@ -167,9 +138,8 @@ type Response struct {
 
 type Handler func(req *Request) *Response
 
-// ---- recoveryミドルウェア ----
-
-// withRecovery はpanicが発生しても500エラーを返すミドルウェア
+// --- recoveryミドルウェア ---
+// なぜ必要か: 1つのリクエストのpanicでサーバー全体が落ちるのを防ぐ
 func withRecovery(next Handler) Handler {
 	return func(req *Request) (resp *Response) {
 		defer func() {
@@ -185,7 +155,7 @@ func withRecovery(next Handler) Handler {
 	}
 }
 
-// withLogging はリクエストログを出力するミドルウェア
+// --- ロギングミドルウェア ---
 func withLogging(next Handler) Handler {
 	return func(req *Request) *Response {
 		fmt.Printf("[LOG] %s %s\n", req.Method, req.Path)
@@ -195,18 +165,13 @@ func withLogging(next Handler) Handler {
 	}
 }
 
-// ---- ハンドラー ----
+// --- ハンドラー ---
 
 func handleHello(req *Request) *Response {
 	return &Response{StatusCode: 200, Body: "Hello, World!"}
 }
 
 func handlePanic(req *Request) *Response {
-	// 意図しないpanicが発生するケース
-	var data map[string]string
-	_ = data["key"] // nil map からの読み込みはpanicしない（ゼロ値が返る）
-
-	// これはpanicする
 	panic("something unexpected happened!")
 }
 
@@ -219,7 +184,7 @@ func main() {
 	resp := helloHandler(&Request{Path: "/hello", Method: "GET"})
 	fmt.Printf("Response: %d - %s\n\n", resp.StatusCode, resp.Body)
 
-	// panicが発生するリクエスト（recoverで500が返る）
+	// panicが発生するリクエスト → recoverで500が返る
 	resp = panicHandler(&Request{Path: "/panic", Method: "GET"})
 	fmt.Printf("Response: %d - %s\n\n", resp.StatusCode, resp.Body)
 
@@ -247,7 +212,7 @@ func main() {
 
 ## ✅ 重要ポイント
 
-- [ ] panicは通常のエラーではなく、致命的な状況（設定不備、不変条件違反）に使う
+- [ ] panicは致命的な状況（設定不備、不変条件違反）に使う。通常のエラーにはerror型
 - [ ] recoverはdeferの中でのみ動作する
 - [ ] `Must`で始まる関数はpanicの可能性を示す慣習
 - [ ] HTTPサーバーではrecoveryミドルウェアで500を返すのが標準パターン
